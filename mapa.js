@@ -237,6 +237,16 @@ export const mapa = {
             let newColor = rota.cor || '#ffffff';
             let alertColor = null;
 
+            if (rota.manutencao_ativa) {
+                newColor = '#F59E0B';
+                alertColor = '#F59E0B';
+                linha.setOptions({ strokeColor: newColor });
+                rota.corDeAlerta = alertColor;
+                const glowLine = mapa.linhasDesenhadas.find(l => l.rotaData && l.rotaData.id === rota.id && l.tipoLinha === 'glow');
+                if (glowLine) glowLine.setOptions({ strokeColor: newColor });
+                return;
+            }
+
             let rotaEstaDown = false;
             if (rota.zabbix_items && rota.zabbix_items.status && rota.zabbix_items.status.length > 0) {
                 for (const statusId of rota.zabbix_items.status) {

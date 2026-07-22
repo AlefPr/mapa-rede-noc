@@ -30,7 +30,7 @@ async function syncZabbixCache(io) {
   isSyncing = true;
   try {
     const [allRows] = await db.execute(
-      'SELECT rz.zabbix_itemid, rz.rota_id, rz.tipo_item, r.nome_rota FROM rota_zabbix_items rz JOIN rotas r ON rz.rota_id = r.id'
+      'SELECT rz.zabbix_itemid, rz.rota_id, rz.tipo_item, r.nome_rota FROM rota_zabbix_items rz JOIN rotas r ON rz.rota_id = r.id WHERE (r.manutencao_ativa IS NULL OR r.manutencao_ativa = 0)'
     );
     const itemIds = [...new Set(allRows.map(r => r.zabbix_itemid))];
     

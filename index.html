@@ -66,6 +66,7 @@
                 <span id="hc-dot" class="hc-status-dot up"></span>
                 <h4 id="hc-route-name">NOME DA ROTA</h4>
                 <span id="hc-badge" class="hc-badge up">UP</span>
+                <span id="hc-maint-tag" style="display:none; background:#f59e0b; color:#0f172a; font-size:8px; font-weight:700; padding:1px 5px; border-radius:3px; letter-spacing:0.3px; margin-left:4px;">MANUT</span>
             </div>
             <div id="hc-interface-name" class="hc-subtitle">Monitoramento Zabbix ativo</div>
         </div>
@@ -78,6 +79,7 @@
             <div id="hc-sparkline" style="min-height: 50px;"></div> 
         </div>
         <div class="hc-details">
+            <div id="hc-maint-row" class="hc-row" style="display:none;"><span class="hc-label"><i class="ph ph-wrench" style="color:#f59e0b"></i> Manutenção</span><span class="hc-value" style="color:#f59e0b; font-weight:700;">ATIVA</span></div>
             <div class="hc-row"><span class="hc-label">Distância Calculada</span><span id="hc-dist" class="hc-value">--</span></div>
             <div class="hc-row"><span class="hc-label">Capacidade Nominal</span><span id="hc-cap" class="hc-value">--</span></div>
             <div class="hc-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1);"><span class="hc-label"><i class="ph ph-waveform"></i> Sinal Óptico (RX)</span><span id="hc-rx" class="hc-value" style="font-weight: 700;">-- dBm</span></div>
@@ -95,6 +97,7 @@
                     <div id="route-identity-bar" style="display:none; align-items:center; gap:6px; margin-top:6px; padding-top:6px; border-top:1px solid var(--border);">
                         <span id="route-id-dot" style="width:8px; height:8px; border-radius:50%; flex-shrink:0; display:inline-block;"></span>
                         <span id="route-id-name" style="color:#94a3b8; font-weight:500; font-size:11px;"></span>
+                        <span id="route-maint-badge" style="display:none; background:#f59e0b; color:#0f172a; font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; letter-spacing:0.3px;">MANUTENÇÃO</span>
                         <span style="color:#475569; font-size:10px;">→</span>
                         <span id="route-id-path" style="color:#64748b; font-family:var(--font-mono); font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
                     </div>
@@ -116,6 +119,7 @@
                     <button type="button" id="btn-focar-rota" class="action-btn" title="Centralizar e Zoom (Ctrl+Shift+F)"><i class="ph ph-crosshair"></i> Centralizar</button>
                     <button type="button" id="btn-smart-copy" class="action-btn" title="Copiar Relatório (Ctrl+C)"><i class="ph ph-copy"></i> Copiar</button>
                     <button type="button" id="btn-isolar-rota" class="action-btn" title="Isolar no Mapa"><i class="ph ph-star"></i> Isolar</button>
+                    <button type="button" id="btn-manutencao-rota" class="action-btn" title="Ativar/Desativar Modo Manutenção"><i class="ph ph-wrench"></i> Manutenção</button>
                     <button type="button" id="btn-partilhar-rota" class="action-btn" style="display: none;" title="Partilhar Rota"><i class="ph ph-share-network"></i> Partilhar</button>
                 </div>
 

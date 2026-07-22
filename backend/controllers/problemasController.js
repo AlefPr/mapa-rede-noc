@@ -15,12 +15,19 @@ exports.webhook = async (req, res, io) => {
 
     connection = await db.getConnection();
 
-    const [itens] = await connection.execute('SELECT rota_id FROM rota_zabbix_items WHERE zabbix_itemid = ? LIMIT 1', [itemid]);
+    const [itens] = await connection.execute(
+      'SELECT ri.rota_id, r.manutencao_ativa FROM rota_zabbix_items ri JOIN rotas r ON ri.rota_id = r.id WHERE ri.zabbix_itemid = ? LIMIT 1',
+      [itemid]
+    );
     if (itens.length === 0) return res.json({ message: "Ignorado. Item não pertence a nenhuma rota mapeada." });
 
     const rotaId = itens[0].rota_id;
+    const emManutencao = itens[0].manutencao_ativa == 1;
 
     if (trigger_status === "PROBLEM") {
+      if (emManutencao) {
+        return res.json({ message: "Ignorado. Rota está em manutenção." });
+      }
       const [existente] = await connection.execute('SELECT id FROM problemas WHERE trigger_id = ? AND status = "Ativo"', [trigger_id]);
       if (existente.length === 0) {
         await connection.execute(

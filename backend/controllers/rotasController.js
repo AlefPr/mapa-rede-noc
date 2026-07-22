@@ -151,6 +151,32 @@ exports.atualizarRota = async (req, res, io) => {
   }
 };
 
+exports.toggleManutencao = async (req, res, io) => {
+  try {
+    const { id } = req.params;
+    const { ativa, ate } = req.body;
+
+    const ateValue = ate || null;
+    await db.execute('UPDATE rotas SET manutencao_ativa = ?, manutencao_ate = ? WHERE id = ?', [ativa ? 1 : 0, ateValue, id]);
+
+    const [rota] = await db.execute('SELECT * FROM rotas WHERE id = ?', [id]);
+    if (rota.length === 0) return res.status(404).json({ error: 'Rota não encontrada.' });
+
+    io.emit('rotaManutencaoAtualizada', {
+      id: rota[0].id,
+      nome_rota: rota[0].nome_rota,
+      manutencao_ativa: !!rota[0].manutencao_ativa,
+      manutencao_ate: rota[0].manutencao_ate
+    });
+
+    logger.info(`Manutenção ${ativa ? 'ativada' : 'desativada'} para rota ID ${id}`);
+    res.json({ message: `Manutenção ${ativa ? 'ativada' : 'desativada'} com sucesso!` });
+  } catch (error) {
+    logger.error(`Erro ao alternar manutenção da rota ID ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Erro interno no servidor.' });
+  }
+};
+
 exports.excluirRota = async (req, res, io) => {
   try {
     const { id } = req.params;

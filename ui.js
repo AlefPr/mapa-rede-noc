@@ -269,6 +269,23 @@ export const ui = {
                 }
             }
 
+            // ==========================================
+            // MODO MANUTENÇÃO
+            // ==========================================
+            if (target.matches('#btn-manutencao-rota') || target.closest('#btn-manutencao-rota')) {
+                if (!state.rotaSelecionada) return;
+                const rota = state.rotaSelecionada;
+                const ativa = !rota.manutencao_ativa;
+                api.toggleManutencao(rota.id, ativa).then(() => {
+                    rota.manutencao_ativa = ativa ? 1 : 0;
+                    ui.atualizarBadgeManutencao(rota);
+                    mapa.renderizarRotasNoMapa(state.rotasSalvas);
+                    ui.mostrarToast(ativa ? 'Modo manutenção ativado.' : 'Modo manutenção desativado.', 'info');
+                }).catch(e => {
+                    ui.mostrarToast('Erro ao alternar manutenção.', 'error');
+                });
+            }
+
             // ========================================================
             // BUG 1 FIX: ABERTURA DO MODAL DE TELEMETRIA
             // ========================================================
@@ -760,7 +777,14 @@ export const ui = {
             statusEl.style.cssText = '';
             const alerta = rota ? (rota.corDeAlerta ? rota.corDeAlerta.toUpperCase() : null) : null;
 
-            if (alerta === '#FF0000') {
+            if (rota && rota.manutencao_ativa) {
+                statusEl.textContent = 'Manutenção';
+                statusEl.className = 'stat-value badge';
+                statusEl.style.background = 'rgba(245, 158, 11, 0.2)';
+                statusEl.style.color = '#f59e0b';
+                statusEl.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+                if (statusCard) statusCard.style.borderLeftColor = '#f59e0b';
+            } else if (alerta === '#FF0000') {
                 statusEl.textContent = 'DOWN';
                 statusEl.className = 'stat-value badge badge-danger';
                 if (statusCard) statusCard.style.borderLeftColor = '#ef4444';
@@ -862,6 +886,8 @@ export const ui = {
             document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active'));
             const cardAtivo = document.querySelector(`.style-card[data-style="${rota.estilo || 'solida'}"]`);
             if (cardAtivo) cardAtivo.classList.add('active');
+
+            ui.atualizarBadgeManutencao(rota);
 
             // INTELIGÊNCIA GEOGRÁFICA
             const elDist = document.getElementById('route-distance-value');
@@ -1016,7 +1042,9 @@ export const ui = {
         let statusText = 'UP'; let statusClass = 'up';
         const alerta = rota.corDeAlerta ? rota.corDeAlerta.toUpperCase() : null;
 
-        if (alerta === '#FF0000') {
+        if (rota.manutencao_ativa) {
+            statusText = 'MANUT'; statusClass = 'maint';
+        } else if (alerta === '#FF0000') {
             statusText = 'DOWN'; statusClass = 'down';
         }
         else if (alerta === '#FFFF00') {
@@ -1053,6 +1081,13 @@ export const ui = {
                 rxEl.style.color = '#94a3b8';
             }
         }
+
+        const maintRow = document.getElementById('hc-maint-row');
+        if (maintRow) {
+            maintRow.style.display = rota.manutencao_ativa ? 'flex' : 'none';
+        }
+        const maintTag = document.getElementById('hc-maint-tag');
+        if (maintTag) maintTag.style.display = 'none';
 
         telemetria.renderizarSparklineHover(rota);
         card.style.display = 'block';
@@ -1606,18 +1641,35 @@ export const ui = {
         const deleteBtn = document.getElementById('quick-delete-button');
         const limparBtn = document.getElementById('btn-limpar-alarmes');
 
+        const maintBtn = document.getElementById('btn-manutencao-rota');
+
         if (state.autenticado) {
             if (btnLogin) btnLogin.style.display = 'none';
             if (btnLogout) btnLogout.style.display = 'flex';
             if (createBtn) createBtn.style.display = 'flex';
             if (deleteBtn) deleteBtn.style.display = 'flex';
             if (limparBtn) limparBtn.style.display = 'inline-block';
+            if (maintBtn) maintBtn.style.display = 'inline-flex';
         } else {
             if (btnLogin) btnLogin.style.display = 'flex';
             if (btnLogout) btnLogout.style.display = 'none';
             if (createBtn) createBtn.style.display = 'none';
             if (deleteBtn) deleteBtn.style.display = 'none';
             if (limparBtn) limparBtn.style.display = 'none';
+            if (maintBtn) maintBtn.style.display = 'none';
+        }
+    },
+
+    atualizarBadgeManutencao: (rota) => {
+        const badge = document.getElementById('route-maint-badge');
+        const btn = document.getElementById('btn-manutencao-rota');
+        if (!badge || !rota) return;
+        if (rota.manutencao_ativa) {
+            badge.style.display = 'inline-block';
+            if (btn) { btn.innerHTML = '<i class="ph ph-wrench"></i> Sair Manutenção'; btn.style.background = 'rgba(245, 158, 11, 0.15)'; btn.style.color = '#f59e0b'; }
+        } else {
+            badge.style.display = 'none';
+            if (btn) { btn.innerHTML = '<i class="ph ph-wrench"></i> Manutenção'; btn.style.background = 'transparent'; btn.style.color = '#a1a1aa'; }
         }
     }
 };

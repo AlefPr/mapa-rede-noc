@@ -95,4 +95,28 @@ module.exports = (app, io) => {
    *       404: { description: Rota não encontrada }
    */
   app.delete('/api/rotas/:id', autenticarToken, (req, res) => rotasController.excluirRota(req, res, io));
+
+  /**
+   * @openapi
+   * /api/rotas/{id}/manutencao:
+   *   post:
+   *     tags: [Rotas]
+   *     summary: Ativar/desativar modo manutenção
+   *     security: [{ bearerAuth: [] }]
+   *     parameters:
+   *       - { in: path, name: id, required: true, schema: { type: integer } }
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               ativa: { type: boolean }
+   *               ate: { type: string, format: date-time, nullable: true }
+   *     responses:
+   *       200: { description: Status manutenção alterado }
+   *       404: { description: Rota não encontrada }
+   */
+  app.post('/api/rotas/:id/manutencao', autenticarToken, (req, res) => rotasController.toggleManutencao(req, res, io));
 };

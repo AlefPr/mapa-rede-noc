@@ -83,6 +83,19 @@ export const renderer = {
         });
       }
 
+      if (rota.manutencao_ativa) {
+        icons.push({
+          icon: {
+            path: 'M 0,-1 0,1',
+            strokeColor: '#f59e0b',
+            strokeOpacity: 1,
+            scale: espessura * 1.5
+          },
+          offset: '0',
+          repeat: '15px'
+        });
+      }
+
       // ── GLOW ──
       const glow = new google.maps.Polyline({
         path: coords,

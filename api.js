@@ -77,6 +77,21 @@ export const api = {
         }
     },
 
+    toggleManutencao: async (id, ativa, ate = null) => {
+        try {
+            const response = await authFetch(`${state.API_URL_BASE}/rotas/${id}/manutencao`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ativa, ate })
+            });
+            if (!response.ok) throw new Error('Erro ao alternar manutenção');
+            return await response.json();
+        } catch (error) {
+            console.error('Falha na API (toggleManutencao):', error);
+            throw error;
+        }
+    },
+
     limparAlarmes: async () => {
         try {
             const response = await authFetch(`${state.API_URL_BASE}/problemas/limpar`, { method: 'POST' });

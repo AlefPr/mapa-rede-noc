@@ -53,6 +53,16 @@ export const incidentes = {
 
             incidentes.socket.on('novoProblema', () => incidentes.carregarProblemas());
             incidentes.socket.on('problemaResolvido', () => incidentes.carregarProblemas());
+            incidentes.socket.on('rotaManutencaoAtualizada', (dados) => {
+                const rota = state.rotasSalvas.find(r => r.id === dados.id);
+                if (rota) {
+                    rota.manutencao_ativa = dados.manutencao_ativa ? 1 : 0;
+                    if (typeof mapa.atualizarCoresDeSaude === 'function') mapa.atualizarCoresDeSaude();
+                    if (typeof ui.atualizarBadgeManutencao === 'function' && state.rotaSelecionada && state.rotaSelecionada.id === dados.id) {
+                        ui.atualizarBadgeManutencao(rota);
+                    }
+                }
+            });
             
             incidentes.socket.on('zabbixCacheUpdated', (novoCache) => {
                 state.zabbixCacheLocal = novoCache;
