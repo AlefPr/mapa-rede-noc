@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Rede Interativo - NOC Premium</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+
+<body>
+
+  <div id="noc-toolbox" style="position: absolute; bottom: 30px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; background: rgba(24, 24, 27, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 10px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <button id="btn-problemas" title="Central de Incidentes" class="tool-btn" style="position: relative; color: #ef4444;">
+            <i class="ph ph-warning-circle" style="font-size: 22px;"></i>
+            <span id="alarm-badge" style="position: absolute; top: -2px; right: -2px; background: #ef4444; color: white; border-radius: 12px; padding: 2px 5px; font-size: 10px; font-weight: bold; display: none; border: 2px solid #18181b;">0</span>
+        </button>
+        <button id="btn-clima" title="Camada de Clima" class="tool-btn"><i class="ph ph-cloud-rain" style="font-size: 22px;"></i></button>
+        <div style="height: 1px; width: 100%; background: rgba(255,255,255,0.06); margin: 2px 0; border-radius: 1px;"></div>
+        <button id="create-route-button" title="Criar Nova Rota" class="tool-btn" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><i class="ph ph-plus-circle" style="font-size: 22px;"></i></button>
+        <button id="quick-delete-button" title="Modo Exclusão Rápida" class="tool-btn"><i class="ph ph-trash" style="font-size: 22px;"></i></button>
+        <button id="open-inventory-button" title="Inventário de Rede" class="tool-btn"><i class="ph ph-hard-drives" style="font-size: 22px;"></i></button>
+        
+        <label title="Ímã de Ruas" class="tool-btn"><input type="checkbox" id="snap-to-road-checkbox" style="display: none;"><i class="ph ph-magnet" style="font-size: 22px;"></i></label>
+        
+        <label title="Alternar Tema" class="tool-btn"><input type="checkbox" id="dark-mode-checkbox" checked style="display: none;"><i class="ph ph-moon" style="font-size: 22px;"></i></label>
+        <div style="height: 1px; width: 100%; background: rgba(255,255,255,0.06); margin: 2px 0; border-radius: 1px;"></div>
+        <button id="btn-login" title="Autenticação" class="tool-btn" style="color: #60a5fa;"><i class="ph ph-user-circle" style="font-size: 22px;"></i></button>
+        <button id="btn-logout" title="Sair" class="tool-btn" style="color: #ef4444; display: none;"><i class="ph ph-sign-out" style="font-size: 22px;"></i></button>
+    </div>
+ 
+    <div id="alarm-panel">
+        <div class="alarm-header">
+            <div class="alarm-header-left">
+                <i class="ph ph-bell-ringing" style="color: #ef4444; font-size: 18px;"></i>
+                <h3>Central de Incidentes</h3>
+            </div>
+            <div class="alarm-header-right">
+                <button id="btn-limpar-alarmes" title="Limpar Resolvidos" class="btn-secondary" style="padding: 4px 10px; font-size: 12px;"><i class="ph ph-broom"></i> Limpar</button>
+                <button id="close-alarm-panel" class="alarm-close-btn"><i class="ph ph-x"></i></button>
+            </div>
+        </div>
+        <div id="alarm-filters">
+            <button class="filter-btn active" data-severidade="">Todos</button>
+            <button class="filter-btn" data-severidade="Crítico">Crítico</button>
+            <button class="filter-btn" data-severidade="Erro">Erro</button>
+            <button class="filter-btn" data-severidade="Aviso">Aviso</button>
+        </div>
+        <div id="alarm-list"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="route-hover-card">
+        <div class="hc-header">
+            <div class="hc-title-row">
+                <span id="hc-dot" class="hc-status-dot up"></span>
+                <h4 id="hc-route-name">NOME DA ROTA</h4>
+                <span id="hc-badge" class="hc-badge up">UP</span>
+            </div>
+            <div id="hc-interface-name" class="hc-subtitle">Monitoramento Zabbix ativo</div>
+        </div>
+        <div class="hc-traffic">
+            <div class="hc-row"><span class="hc-label"><i class="ph ph-arrow-up" style="color:#60a5fa"></i> Tráfego OUT</span><span id="hc-out" class="hc-value out">-- Mbps</span></div>
+            <div class="hc-row"><span class="hc-label"><i class="ph ph-arrow-down" style="color:#34d399"></i> Tráfego IN</span><span id="hc-in" class="hc-value in">-- Mbps</span></div>
+        </div>
+        <div style="border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; margin-bottom: 10px;">
+            <div style="font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Tráfego Recente (Última Hora)</div>
+            <div id="hc-sparkline" style="min-height: 50px;"></div> 
+        </div>
+        <div class="hc-details">
+            <div class="hc-row"><span class="hc-label">Distância Calculada</span><span id="hc-dist" class="hc-value">--</span></div>
+            <div class="hc-row"><span class="hc-label">Capacidade Nominal</span><span id="hc-cap" class="hc-value">--</span></div>
+            <div class="hc-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1);"><span class="hc-label"><i class="ph ph-waveform"></i> Sinal Óptico (RX)</span><span id="hc-rx" class="hc-value" style="font-weight: 700;">-- dBm</span></div>
+        </div>
+    </div>
+
+
+    <div id="route-drawer" class="offcanvas-drawer">
+        <div class="drawer-header premium-header">
+            <div class="header-title">
+                <i class="ph ph-git-merge text-blue"></i>
+                <div>
+                    <h2 id="drawer-dynamic-title">Painel da Rota</h2>
+                    <span class="header-subtitle">Parâmetros e monitoramento</span>
+                    <div id="route-identity-bar" style="display:none; align-items:center; gap:6px; margin-top:6px; padding-top:6px; border-top:1px solid var(--border);">
+                        <span id="route-id-dot" style="width:8px; height:8px; border-radius:50%; flex-shrink:0; display:inline-block;"></span>
+                        <span id="route-id-name" style="color:#94a3b8; font-weight:500; font-size:11px;"></span>
+                        <span style="color:#475569; font-size:10px;">→</span>
+                        <span id="route-id-path" style="color:#64748b; font-family:var(--font-mono); font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+                    </div>
+                </div>
+            </div>
+            <button id="close-drawer-button" class="btn-close-drawer" title="Fechar"><i class="ph ph-x"></i></button>
+        </div>
+
+       <div class="modal-tabs premium-tabs">
+            <button class="m-tab active" data-target="tab-geral"><i class="ph ph-faders"></i> Visão Geral</button>
+            <button class="m-tab" data-target="tab-zabbix"><i class="ph ph-sliders"></i> Configuração</button>
+            <button class="m-tab" data-target="tab-aparencia"><i class="ph ph-palette"></i> Aparência</button>
+        </div>
+
+        <div class="drawer-body">
+            
+           <div id="tab-geral" class="m-tab-content active">
+                <div class="quick-actions-bar">
+                    <button type="button" id="btn-focar-rota" class="action-btn" title="Centralizar e Zoom (Ctrl+Shift+F)"><i class="ph ph-crosshair"></i> Centralizar</button>
+                    <button type="button" id="btn-smart-copy" class="action-btn" title="Copiar Relatório (Ctrl+C)"><i class="ph ph-copy"></i> Copiar</button>
+                    <button type="button" id="btn-isolar-rota" class="action-btn" title="Isolar no Mapa"><i class="ph ph-star"></i> Isolar</button>
+                    <button type="button" id="btn-partilhar-rota" class="action-btn" style="display: none;" title="Partilhar Rota"><i class="ph ph-share-network"></i> Partilhar</button>
+                </div>
+
+                <div class="quick-stats-grid">
+                    <div class="stat-card-modern card-status">
+                        <div class="stat-icon-wrapper"><i class="ph ph-activity"></i></div>
+                        <div class="stat-info"><span class="stat-label">Status</span><span class="stat-value badge badge-neutral" id="ui-status-badge">Desconhecido</span></div>
+                    </div>
+                    <div class="stat-card-modern card-distance">
+                        <div class="stat-icon-wrapper"><i class="ph ph-ruler"></i></div>
+                        <div class="stat-info"><span class="stat-label">Extensão</span><span class="stat-value" id="route-distance-value"><span class="empty-pulse">···</span></span></div>
+                    </div>
+                    <div class="stat-card-modern card-origin">
+                        <div class="stat-icon-wrapper"><i class="ph ph-map-pin"></i></div>
+                        <div class="stat-info"><span class="stat-label">Origem</span><span class="stat-value" id="ui-route-origin"><span class="empty-pulse">···</span></span></div>
+                    </div>
+                    <div class="stat-card-modern card-dest">
+                        <div class="stat-icon-wrapper"><i class="ph ph-flag-checkered"></i></div>
+                        <div class="stat-info"><span class="stat-label">Destino</span><span class="stat-value" id="ui-route-destination"><span class="empty-pulse">···</span></span></div>
+                    </div>
+                </div>
+
+                <div id="minimap-wrapper" class="minimap-wrapper">
+                    <div id="minimap-container" class="premium-minimap-header"></div>
+                    <div class="minimap-fade-out"></div>
+                    <button type="button" id="toggle-minimap-btn" class="minimap-toggle-btn"><i class="ph ph-caret-up" id="toggle-minimap-icon"></i></button>
+                </div>
+
+                <div class="metrics-panel">
+                    <div class="metrics-header">
+                        <span class="metrics-title">Métricas da Rota</span>
+                    </div>
+                    <div class="metrics-body">
+                        <div class="metrics-row">
+                            <div class="metric-box"><span class="metric-label">Entrada (IN)</span><span class="metric-value" id="kpi-current-in"><span class="empty-pulse">···</span></span></div>
+                            <div class="metric-divider"></div>
+                            <div class="metric-box"><span class="metric-label">Saída (OUT)</span><span class="metric-value" id="kpi-current-out"><span class="empty-pulse">···</span></span></div>
+                            <div class="metric-divider"></div>
+                            <div class="metric-box"><span class="metric-label">Pico</span><span class="metric-value" id="kpi-peak-traffic"><span class="empty-pulse">···</span></span></div>
+                        </div>
+                        <div id="sparkline-geral" style="height:40px; margin-top:6px;"></div>
+                        <div class="metrics-sublink">
+                            <button type="button" id="btn-abrir-analise-trafego" class="btn-link">
+                                <i class="ph ph-chart-line-up"></i> Análise detalhada de tráfego
+                            </button>
+                        </div>
+                    </div>
+                        <div class="metrics-body metrics-body-bordered">
+                        <div class="health-compact">
+                            <div class="health-compact-row">
+                                <span class="metric-label">Saturação</span>
+                                <span class="health-value"><span class="empty-pulse">···</span></span>
+                            </div>
+                            <div class="progress-track"><div class="progress-fill fill-warning" style="width:0%"></div></div>
+                            <div class="health-subtext">Aguardando dados...</div>
+                        </div>
+                        <div class="health-compact" style="margin-top:14px">
+                            <div class="health-compact-row">
+                                <span class="metric-label">Sinal Óptico (RX)</span>
+                                <span id="ui-rx-badge" class="badge badge-neutral"><span class="empty-pulse">···</span></span>
+                            </div>
+                            <div class="rx-signal-display">
+                                <div class="signal-bars" id="ui-rx-bars">
+                                    <div class="signal-bar"></div>
+                                    <div class="signal-bar"></div>
+                                    <div class="signal-bar"></div>
+                                    <div class="signal-bar"></div>
+                                    <div class="signal-bar"></div>
+                                </div>
+                                <span id="ui-rx-value" class="rx-value"><span class="empty-pulse">···</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="metrics-footer">
+                        <span id="last-update-timestamp">--</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="tab-zabbix" class="m-tab-content">
+    
+    <!-- CARD 1: IDENTIFICAÇÃO -->
+    <div class="config-card">
+        <h3><i class="ph ph-identification-card"></i> Identificação</h3>
+        <div class="form-group full-width" style="margin-bottom: 15px;">
+            <label>Nome da Rota</label>
+            <input type="text" id="route-name" placeholder="Ex: Backbone Principal" class="premium-input">
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Capacidade Comercial</label>
+                <input type="number" id="route-capacity" placeholder="Ex: 10" class="premium-input">
+            </div>
+            <div class="form-group">
+                <label>Unidade</label>
+                <select id="route-capacity-unit" class="premium-input">
+                    <option value="gbps">Gbps</option>
+                    <option value="mbps">Mbps</option>
+                </select>
+            </div>
+            <div class="form-group" style="grid-column:1/-1; margin-top:4px;">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Capacidade</span>
+                    <span id="capacity-label" style="font-family:var(--font-mono); font-size:13px; font-weight:600; color:#e2e8f0;">Não configurada</span>
+                </label>
+                <div class="capacity-bar-track"><div id="capacity-bar-fill" class="capacity-bar-fill" style="width:0%"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARD 2: FONTE DE DADOS -->
+    <div class="config-card">
+        <h3><i class="ph ph-hard-drives"></i> Fonte de Dados (Zabbix) <span id="config-status-badge" class="badge badge-neutral" style="margin-left:auto; font-size:9px; padding:2px 8px;">Não configurado</span></h3>
+        <div class="form-group full-width" style="margin-bottom: 15px;">
+            <label style="display: flex; align-items: center; gap: 6px;">
+    Lógica de Cálculo 
+    <i class="ph ph-info" title="Soma Agregada: Junta o tráfego IN e OUT.&#10;Apenas Entrada: Monitora apenas o tráfego de Download." style="cursor: help; color: #64748b; font-size: 14px; transition: color 0.2s;"></i>
+</label>
+            <select id="route-type-select" class="premium-input">
+                <option value="agregado">Soma Agregada (Download + Upload)</option>
+                <option value="download">Apenas Entrada (IN)</option>
+                <option value="upload">Apenas Saída (OUT)</option>
+            </select>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Grupo do Host</label>
+                <select id="zabbix-group-select" class="premium-input"><option value="">-- Grupos --</option></select>
+            </div>
+            <div class="form-group">
+                <label>Ativo de Rede</label>
+                <select id="zabbix-host-select" class="premium-input"><option value="">-- Host --</option></select>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARD 3: PORTAS E TELEMETRIA -->
+    <div class="config-card">
+        <h3><i class="ph ph-plugs"></i> Interfaces & Telemetria</h3>
+        <div class="form-group full-width" style="margin-bottom: 15px;">
+            <label>Interfaces IN <span class="item-health-dot" data-target="in"></span></label>
+            <select id="zabbix-item-in-select" multiple="multiple" class="premium-input"></select>
+        </div>
+        <div class="form-group full-width" style="margin-bottom: 15px;">
+            <label>Interfaces OUT <span class="item-health-dot" data-target="out"></span></label>
+            <select id="zabbix-item-out-select" multiple="multiple" class="premium-input"></select>
+        </div>
+        <div class="form-group full-width">
+            <label>Sinal Óptico (RX) <span class="item-health-dot" data-target="rx"></span></label>
+            <select id="zabbix-item-rx-select" multiple="multiple" class="premium-input"></select>
+        </div>
+    </div>
+
+</div>
+
+            <div id="tab-aparencia" class="m-tab-content">
+    
+    <!-- 1. O PALCO (Live Preview) -->
+    <div class="live-preview-box">
+        <div id="preview-line"></div>
+    </div>
+
+    <!-- 2. PRESETS OPERACIONAIS -->
+    <div class="config-card">
+        <h3><i class="ph ph-magic-wand"></i> Presets de Topologia</h3>
+        <div class="preset-grid">
+            <button type="button" class="btn-preset" data-preset="backbone">Backbone</button>
+            <button type="button" class="btn-preset" data-preset="backup">Backup</button>
+            <button type="button" class="btn-preset" data-preset="cliente">Cliente</button>
+        </div>
+    </div>
+
+    <!-- 3. ESTILO BASE -->
+    <div class="config-card">
+        <h3><i class="ph ph-paint-brush"></i> Estilo Base</h3>
+        
+        <div class="form-group full-width" style="margin-bottom: 24px;">
+            <label>Paleta de Cores Rápida</label>
+            <div class="quick-colors" style="gap: 12px; margin-top: 8px;">
+                <button type="button" class="color-btn" data-color="#3b82f6" style="background: #3b82f6;"></button>
+                <button type="button" class="color-btn" data-color="#10b981" style="background: #10b981;"></button>
+                <button type="button" class="color-btn" data-color="#f97316" style="background: #f97316;"></button>
+                <button type="button" class="color-btn" data-color="#ef4444" style="background: #ef4444;"></button>
+                <button type="button" class="color-btn" data-color="#8b5cf6" style="background: #8b5cf6;"></button>
+                <div class="custom-color-picker" title="Cor Customizada">
+                    <input type="color" id="route-color" value="#3b82f6">
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group full-width">
+            <label style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <span>Espessura da Rota</span>
+                <span id="width-display-value" style="color: #3b82f6; font-weight: 700;">3 px</span>
+            </label>
+            <!-- Substituímos o input de número antigo por um Range Slider moderno -->
+            <input type="range" id="route-width" min="1" max="20" value="3" class="premium-slider">
+        </div>
+        <div class="form-group full-width" id="glow-control" style="display:none;">
+            <label style="display:flex; justify-content:space-between;"><span>Intensidade do Brilho (Neon)</span><span id="glow-display-value" style="color:#a78bfa; font-weight:700;">10</span></label>
+            <input type="range" id="route-glow" min="0" max="30" value="10" class="premium-slider">
+        </div>
+        <div class="form-group full-width" id="dash-control" style="display:none;">
+            <label style="display:flex; justify-content:space-between;"><span>Espaçamento dos Traços</span><span id="dash-display-value" style="color:#94a3b8; font-weight:700;">25</span></label>
+            <input type="range" id="route-dash" min="10" max="50" value="25" class="premium-slider">
+        </div>
+    </div>
+
+    <!-- 4. EFEITOS ESPECIAIS -->
+    <div class="config-card">
+        <h3><i class="ph ph-sparkle"></i> Efeitos e Comportamento</h3>
+        <div class="style-selector-grid" style="margin-top: 8px;">
+            <div class="style-card active" data-style="solida" title="Estilo padrão: Ideal para enlaces normais e operacionais."><i class="ph ph-minus"></i> Sólida</div>
+            <div class="style-card" data-style="tracejada" title="Link Lógico: Ideal para representar VPNs, túneis ou conexões de backup."><i class="ph ph-dots-three"></i> Tracejada</div>
+            <div class="style-card" data-style="setas" title="Fluxo Direcionado: Exibe setas animadas indicando a direção do tráfego."><i class="ph ph-arrows-right"></i> Setas</div>
+            <div class="style-card" data-style="neon" title="Missão Crítica: Destaca rotas vitais ou de backbone com um brilho intenso."><i class="ph ph-lightning"></i> Neon</div>
+            <div class="style-card" data-style="particulas" title="Tráfego Ativo: Partículas animadas representando pacotes fluindo pela rede."><i class="ph ph-sparkle"></i> Partículas</div>
+        </div>
+        <!-- Input oculto para guardar a seleção do estilo -->
+        <input type="hidden" id="route-style-select" value="solida">
+    </div>
+
+</div>
+
+        </div>
+
+        <div class="drawer-footer">
+            <button id="delete-route-button" class="btn-danger" style="display: none;"><i class="ph ph-trash"></i> Excluir</button>
+            <div class="right-buttons" style="display: flex; gap: 10px; margin-left: auto;">
+                <button id="modal-cancel-button" class="btn-secondary">Cancelar (Esc)</button>
+                <button id="modal-save-button" class="btn-primary">Salvar Rota (Ctrl+Enter)</button>
+            </div>
+        </div>
+    </div>
+
+
+
+<style>
+        .split-modal-body { display: flex; padding: 0 !important; overflow: hidden; background: #09090b; flex: 1; }
+        .sidebar-interfaces { width: 280px; border-right: 1px solid #27272a; display: flex; flex-direction: column; background: rgba(15, 23, 42, 0.4); flex-shrink: 0; }
+        .sidebar-header { padding: 15px 20px; border-bottom: 1px solid #27272a; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(0,0,0,0.2); }
+        .iface-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+        
+        .iface-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px 15px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: 0.2s; }
+        .iface-card:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); }
+        .iface-card.active { background: rgba(59, 130, 246, 0.1); border-color: #3b82f6; box-shadow: inset 4px 0 0 #3b82f6; }
+        
+        .iface-info { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+        .iface-name { font-size: 13px; font-weight: 600; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .iface-status { font-size: 10px; color: #34d399; font-weight: 700; text-transform: uppercase; }
+        .iface-check { accent-color: #3b82f6; width: 16px; height: 16px; cursor: pointer; }
+
+        .analytics-pane { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
+        .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .kpi-card-mini { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 15px; display: flex; flex-direction: column; gap: 5px; }
+        .kpi-card-mini .label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+        .kpi-card-mini .val { font-size: 18px; font-weight: 600; color: #f8fafc; font-family: monospace; }
+        .val.in { color: #34d399; } .val.out { color: #60a5fa; }
+
+    </style>
+
+    <div id="traffic-analysis-modal" class="modal-overlay" style="backdrop-filter: blur(8px);">
+        <div class="modal-content premium-modal" style="width: 1400px; max-width: 95vw; height: 90vh; display: flex; flex-direction: column;">
+            
+            <div class="modal-header" style="padding: 20px 24px; border-bottom: 1px solid #27272a; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                <h2 style="margin: 0; display: flex; align-items: center; gap: 10px; color: #f4f4f5; font-size: 18px;">
+                    <i class="ph ph-chart-polar" style="color: #3b82f6; font-size: 24px;"></i> Dashboard de Telemetria
+                </h2>
+                
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <div style="min-width: 250px;">
+                        <select id="wide-interface-select" class="premium-input" multiple="multiple" style="width: 100%;"></select>
+                    </div>
+                    <div class="period-selector" style="margin: 0; display: flex; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <button class="period-button active" data-period="1h">1h</button>
+                        <button class="period-button" data-period="6h">6h</button>
+                        <button class="period-button" data-period="24h">24h</button>
+                    </div>
+                    <button type="button" id="btn-refresh-traffic" class="btn-secondary" style="padding: 8px 16px; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                        <i class="ph ph-arrows-clockwise"></i> Atualizar
+                    </button>
+                    <div style="width: 1px; height: 24px; background: #27272a; margin: 0 5px;"></div>
+                    <button id="close-traffic-modal" class="btn-secondary" style="margin: 0; padding: 8px; border: none; background: transparent; color: #94a3b8;">
+                        <i class="ph ph-x" style="font-size: 20px;"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-body split-modal-body">
+                <div class="sidebar-interfaces">
+                    <div class="sidebar-header"><i class="ph ph-list-dashes"></i> Interfaces do Enlace</div>
+                    <div id="interface-list-container" class="iface-list">
+                        </div>
+                </div>
+
+                <div class="analytics-pane">
+                    <div class="kpi-row">
+                        <div class="kpi-card-mini"><span class="label">Pico Máximo IN</span><span class="val in" id="kpi-max-in">-- Mbps</span></div>
+                        <div class="kpi-card-mini"><span class="label">Pico Máximo OUT</span><span class="val out" id="kpi-max-out">-- Mbps</span></div>
+                        <div class="kpi-card-mini"><span class="label">Média IN</span><span class="val in" id="kpi-avg-in">-- Mbps</span></div>
+                        <div class="kpi-card-mini"><span class="label">Média OUT</span><span class="val out" id="kpi-avg-out">-- Mbps</span></div>
+                    </div>
+
+                    <div class="internal-chart-wrapper" style="background: rgba(2, 6, 23, 0.5); border-radius: 12px; padding: 15px 20px 0 20px; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.2);">
+                        <h4 style="font-size: 12px; color: #94a3b8; margin: 0 0 10px 0; font-weight: 700; text-transform: uppercase;"><i class="ph ph-arrows-left-right" style="color: #3b82f6; margin-right: 6px;"></i>Tráfego Agregado</h4>
+                        <div id="wide-chart-traffic" style="min-height: 350px; width: 100%;"></div>
+                    </div>
+
+                    <div class="internal-chart-wrapper" style="background: rgba(2, 6, 23, 0.5); border-radius: 12px; padding: 15px 20px 0 20px; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.2); margin-bottom: 20px;">
+                        <h4 style="font-size: 12px; color: #94a3b8; margin: 0 0 10px 0; font-weight: 700; text-transform: uppercase;"><i class="ph ph-waveform" style="color: #fbbf24; margin-right: 6px;"></i>Sinal Óptico (RX)</h4>
+                        <div id="wide-chart-rx" style="min-height: 200px; width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="inventory-modal" class="modal-overlay" style="backdrop-filter: blur(4px);">
+        <div class="modal-content premium-modal" style="width: 850px; max-width: 90vw;">
+            <div class="modal-header" style="padding: 20px 24px; border-bottom: 1px solid #27272a !important; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; display: flex; align-items: center; gap: 10px; color: #f4f4f5; font-size: 18px;"><i class="ph ph-hard-drives" style="color: #3b82f6; font-size: 24px;"></i> Inventário de Fibras</h2>
+                <button id="close-inventory-button" class="btn-secondary" style="margin: 0; display: flex; align-items: center; gap: 6px;"><i class="ph ph-x"></i> Fechar</button>
+            </div>
+            <div class="modal-body" style="padding: 0; max-height: 65vh; overflow-y: auto;">
+                <table class="inventory-table">
+                    <thead><tr><th style="width: 60px; text-align: center;">Cor</th><th>Nome da Rota</th><th>Distância</th><th>Capacidade</th><th style="text-align: right; padding-right: 24px;">Ação</th></tr></thead>
+                    <tbody id="inventory-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audio-alarme" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+    <div id="route-context-menu" style="display: none;">
+        <div id="cm-route-name" style="font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px; padding: 10px 12px; border-bottom: 1px dashed rgba(255,255,255,0.1); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nome da Rota</div>
+        <div class="cm-item" id="cm-btn-focar"><i class="ph ph-crosshair" style="color: #38bdf8;"></i> Focar Câmera (Drone)</div>
+        <div class="cm-item" id="cm-btn-historico"><i class="ph ph-chart-line-up" style="color: #34d399;"></i> Analisar Telemetria</div>
+        <div class="cm-item" id="cm-btn-editar"><i class="ph ph-pencil-simple" style="color: #fbbf24;"></i> Editar Rota</div>
+    </div>
+    
+    <div id="widget-alarms" class="noc-widget" style="bottom: 20px; right: 20px; width: 320px;">
+        <div class="noc-widget-header" style="color: #f87171;">
+            <span><i class="ph ph-warning"></i> Incidentes Críticos</span>
+            <i class="ph ph-minus widget-toggle"></i>
+        </div>
+        <div class="noc-widget-content" id="w-alarms-list" style="padding: 10px;"><div style="padding: 10px; color: #94a3b8; font-size: 12px; text-align: center;"><i class="ph ph-check-circle" style="color: #34d399; font-size: 16px; vertical-align: middle;"></i> Tudo Operacional</div></div>
+    </div>
+
+
+
+<div id="command-palette-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 20000; justify-content: center; align-items: flex-start; padding-top: 15vh;">
+        <div id="command-palette-box" style="background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; width: 600px; max-width: 90%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                <i class="ph ph-magnifying-glass" style="color: #94a3b8; font-size: 24px; margin-right: 15px;"></i>
+                <input type="text" id="command-palette-input" placeholder="Buscar rota... (Ex: PMW)" autocomplete="off" style="flex: 1; background: transparent; border: none; color: #f8fafc; font-size: 18px; outline: none; font-family: 'Inter', sans-serif;">
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 4px 8px; border-radius: 4px; font-size: 10px; color: #94a3b8; font-weight: 600; letter-spacing: 1px;">ESC</div>
+            </div>
+            <div id="command-palette-results" style="max-height: 350px; overflow-y: auto; padding: 10px 0;"></div>
+        </div>
+    </div>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script type="module" src="main.js"></script>
+
+</body>
+</html>

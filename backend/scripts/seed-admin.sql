@@ -1,0 +1,11 @@
+-- Seed: criar admin inicial (apenas se o script Node falhar)
+--
+-- Recomendado usar o script interativo:
+--   cd backend && node scripts/criar-usuario.mjs
+--
+-- Alternativa manual (substitua o hash por um gerado em https://bcrypt-generator.com/ cost 10):
+-- INSERT IGNORE INTO usuarios (username, password)
+-- VALUES ('noc_admin', '$2a$10$SEU_HASH_AQUI');
+-- 
+-- Para remover o registo público, o endpoint /api/auth/registar foi mantido
+-- apenas para uso interno via script/curl. O frontend já não expõe o registo.

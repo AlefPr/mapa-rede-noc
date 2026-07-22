@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>noculys.io · autenticação</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232563EB'/%3E%3Ctext x='16' y='23' font-size='17' font-weight='bold' fill='white' text-anchor='middle' font-family='monospace'%3En%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0; padding: 0; box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #050B14;
+      --panel: #0A0F1A;
+      --surface: rgba(255, 255, 255, 0.03);
+      --border: rgba(148, 163, 184, 0.06);
+      --border-active: rgba(148, 163, 184, 0.15);
+      --text: #E2E8F0;
+      --text-dim: #475569;
+      --text-muted: #334155;
+      --green: #22C55E;
+      --blue: #2563EB;
+      --blue-hover: #3B82F6;
+      --red: #EF4444;
+      --font: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      --radius: 6px;
+      --transition: 150ms ease;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-size: 14px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ── LEFT PANEL ── */
+    .panel-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .panel-info::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background:
+        radial-gradient(ellipse at 30% 50%, rgba(37, 99, 235, 0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 50%, rgba(34, 197, 94, 0.02) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .info-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-line {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--green);
+      margin-bottom: 48px;
+      letter-spacing: 0.3px;
+    }
+
+    .logo-line::before {
+      content: '◆ ';
+      color: var(--blue);
+    }
+
+    .clock-display {
+      font-size: 72px;
+      font-weight: 700;
+      letter-spacing: -2px;
+      line-height: 1;
+      color: var(--text);
+      margin-bottom: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .date-display {
+      font-size: 15px;
+      color: var(--text-dim);
+      margin-bottom: 48px;
+      font-weight: 400;
+    }
+
+    .status-grid {
+      display: flex;
+      gap: 32px;
+    }
+
+    .status-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .status-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status-value {
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .status-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-dot.offline { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+    .terminal-line {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 16px;
+    }
+
+    .terminal-line span {
+      color: var(--text-muted);
+    }
+
+    .terminal-line .prompt {
+      color: var(--green);
+    }
+
+    .terminal-line .cmd {
+      color: var(--text);
+    }
+
+    /* ── SCROLLING LOG ── */
+    .log-container {
+      margin-top: 32px;
+      max-height: 120px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .log-container::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 40px;
+      background: linear-gradient(transparent, var(--bg));
+      pointer-events: none;
+    }
+
+    .log-line {
+      font-size: 11px;
+      color: var(--text-dim);
+      padding: 2px 0;
+      white-space: nowrap;
+      opacity: 0;
+      animation: logFadeIn 0.3s ease forwards;
+    }
+
+    @keyframes logFadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .log-line .ts { color: var(--text-muted); }
+    .log-line .info { color: var(--green); }
+
+    /* ── RIGHT PANEL ── */
+    .panel-auth {
+      width: 420px;
+      min-width: 420px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 64px 48px;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+    }
+
+    .auth-header {
+      margin-bottom: 48px;
+    }
+
+    .auth-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+
+    .auth-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .error-line {
+      display: none;
+      font-size: 12px;
+      color: var(--red);
+      margin-bottom: 20px;
+      padding: 10px 14px;
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.1);
+      border-radius: var(--radius);
+    }
+
+    .error-line.visible {
+      display: block;
+    }
+
+    .error-line::before {
+      content: '! ';
+      font-weight: 700;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .input-row:focus-within {
+      border-color: var(--border-active);
+      background: rgba(255, 255, 255, 0.04);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+    }
+
+    .input-prefix {
+      padding: 0 0 0 14px;
+      font-size: 13px;
+      color: var(--text-dim);
+      font-family: var(--font);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .input-prefix .arrow {
+      color: var(--green);
+    }
+
+    .input-row input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 16px 14px;
+      font-family: var(--font);
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      min-width: 0;
+    }
+
+    .input-row input::placeholder {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .toggle-pass {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0 14px;
+      font-family: var(--font);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: var(--transition);
+      flex-shrink: 0;
+    }
+
+    .toggle-pass:hover {
+      color: var(--text-dim);
+    }
+
+    .field-error {
+      font-size: 11px;
+      color: var(--red);
+      margin-top: 6px;
+      display: none;
+      padding-left: 2px;
+    }
+
+    .btn-auth {
+      width: 100%;
+      margin-top: 28px;
+      padding: 16px;
+      background: var(--blue);
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      transition: background var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .btn-auth:hover {
+      background: var(--blue-hover);
+    }
+
+    .btn-auth:active {
+      transform: scale(0.98);
+    }
+
+    .btn-auth:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-auth .spinner {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: var(--text);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    .btn-auth.loading .spinner { display: inline-block; }
+    .btn-auth.loading .btn-label { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .auth-footer {
+      margin-top: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .panel-info { display: none; }
+      .panel-auth {
+        width: 100%;
+        min-width: 0;
+        border-left: none;
+        padding: 48px 32px;
+        align-items: center;
+      }
+      .auth-wrapper { width: 100%; max-width: 380px; }
+    }
+
+    @media (max-width: 480px) {
+      .panel-auth { padding: 32px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- LEFT: SYSTEM INFO -->
+  <section class="panel-info">
+    <div class="info-content">
+      <div class="logo-line">noculys.io  ·  v2.0.1</div>
+
+      <div class="clock-display" id="clock">--:--:--</div>
+      <div class="date-display" id="date">---</div>
+
+      <div class="status-grid">
+        <div class="status-item">
+          <span class="status-label">API</span>
+          <span class="status-value"><span class="status-dot offline" id="s-api"></span><span id="sl-api">Checking</span></span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Base de Dados</span>
+          <span class="status-value"><span class="status-dot offline" id="s-db"></span><span id="sl-db">---</span></span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Redis</span>
+          <span class="status-value"><span class="status-dot offline" id="s-redis"></span><span id="sl-redis">---</span></span>
+        </div>
+      </div>
+
+      <div class="terminal-line">
+        <span><span class="prompt">noculys</span>@<span class="cmd">last login</span></span>
+        <span id="last-login">---</span>
+      </div>
+
+      <div class="log-container">
+        <div class="log-scroll" id="log-scroll"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: AUTH -->
+  <section class="panel-auth">
+    <div class="auth-wrapper">
+      <div class="auth-header">
+        <div class="auth-title">> noculys.io login</div>
+        <div class="auth-subtitle">digite as credenciais de acesso</div>
+      </div>
+
+      <div class="error-line" id="error-line"></div>
+
+      <form id="login-form" autocomplete="off" novalidate>
+        <div class="form-group">
+          <div class="input-row">
+            <span class="input-prefix"><span class="arrow">&gt;</span> user</span>
+            <input type="text" id="username" placeholder="utilizador" autocomplete="username" spellcheck="false">
+          </div>
+          <div class="field-error" id="username-error">campo obrigatório</div>
+        </div>
+
+        <div class="form-group">
+          <div class="input-row">
+            <span class="input-prefix"><span class="arrow">&gt;</span> pass</span>
+            <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+            <button type="button" class="toggle-pass" id="toggle-pass">ver</button>
+          </div>
+          <div class="field-error" id="password-error">campo obrigatório</div>
+        </div>
+
+        <button type="submit" class="btn-auth" id="btn-login">
+          <span class="btn-label">Autenticar</span>
+          <span class="spinner"></span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <span>noculys.io</span>
+        <span>v2.0.1 · 2026</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function() {
+  // ── CLOCK ──
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      String(now.getHours()).padStart(2, '0') + ':' +
+      String(now.getMinutes()).padStart(2, '0') + ':' +
+      String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('date').textContent =
+      now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // ── LOGS ──
+  const LOGS = [
+    { tag: 'ok', service: 'system', msg: 'NOC daemon started' },
+    { tag: 'ok', service: 'mysql', msg: 'connection pool ready' },
+    { tag: 'ok', service: 'redis', msg: 'connected to 127.0.0.1:6379' },
+    { tag: 'ok', service: 'zabbix', msg: 'cache sync completed · 43 items' },
+    { tag: 'ok', service: 'socket.io', msg: 'listening on port 3000' },
+    { tag: 'ok', service: 'system', msg: 'monitoring daemon started' },
+    { tag: 'ok', service: 'mysql', msg: 'connection pool ready' },
+    { tag: 'ok', service: 'redis', msg: 'connected to 127.0.0.1:6379' },
+    { tag: 'ok', service: 'zabbix', msg: 'cache sync completed · 43 items' },
+    { tag: 'ok', service: 'socket.io', msg: 'listening on port 3000' },
+  ];
+
+  const scroll = document.getElementById('log-scroll');
+  let idx = 0;
+
+  function addLog() {
+    if (idx >= LOGS.length) return;
+    const e = LOGS[idx++];
+    const div = document.createElement('div');
+    div.className = 'log-line';
+    div.innerHTML = '<span class="ts">[' + e.tag + ']</span> <span class="info">' + e.service + '</span> ' + e.msg;
+    scroll.appendChild(div);
+  }
+
+  for (let i = 0; i < 4; i++) addLog();
+  const iv = setInterval(() => { addLog(); if (idx >= LOGS.length) clearInterval(iv); }, 500);
+
+  // ── HEALTH CHECK ──
+  function setStatus(dotId, labelId, ok) {
+    const dot = document.getElementById(dotId);
+    const label = document.getElementById(labelId);
+    if (!dot || !label) return;
+    dot.className = 'status-dot ' + (ok ? 'online' : 'offline');
+    label.textContent = ok ? 'Online' : 'Offline';
+  }
+
+  async function checkHealth() {
+    try {
+      const res = await fetch('/mapa/health');
+      if (res.ok) {
+        const data = await res.json();
+        setStatus('s-api', 'sl-api', true);
+        setStatus('s-db', 'sl-db', data.mariadb === true);
+        setStatus('s-redis', 'sl-redis', data.redis === true);
+      } else {
+        setStatus('s-api', 'sl-api', false);
+        setStatus('s-db', 'sl-db', false);
+        setStatus('s-redis', 'sl-redis', false);
+      }
+    } catch {
+      setStatus('s-api', 'sl-api', false);
+      setStatus('s-db', 'sl-db', false);
+      setStatus('s-redis', 'sl-redis', false);
+    }
+  }
+  checkHealth();
+  setInterval(checkHealth, 10000);
+
+  // ── LAST LOGIN ──
+  const lastLogin = localStorage.getItem('noc_last_login');
+  document.getElementById('last-login').textContent = lastLogin || 'Nunca  ·  primeiro acesso';
+
+  // ── AUTH FORM ──
+  const form = document.getElementById('login-form');
+  const btn = document.getElementById('btn-login');
+  const userInput = document.getElementById('username');
+  const passInput = document.getElementById('password');
+  const toggleBtn = document.getElementById('toggle-pass');
+  const errorLine = document.getElementById('error-line');
+  const userErr = document.getElementById('username-error');
+  const passErr = document.getElementById('password-error');
+
+  toggleBtn.addEventListener('click', () => {
+    const hidden = passInput.getAttribute('type') === 'password';
+    passInput.setAttribute('type', hidden ? 'text' : 'password');
+    toggleBtn.textContent = hidden ? 'ocultar' : 'ver';
+  });
+
+  userInput.addEventListener('input', () => { userErr.style.display = 'none'; errorLine.classList.remove('visible'); });
+  passInput.addEventListener('input', () => { passErr.style.display = 'none'; errorLine.classList.remove('visible'); });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const username = userInput.value.trim();
+    const password = passInput.value;
+    let valid = true;
+
+    if (!username) { userErr.textContent = 'insira o username'; userErr.style.display = 'block'; valid = false; }
+    if (!password) { passErr.textContent = 'insira a password'; passErr.style.display = 'block'; valid = false; }
+    if (!valid) return;
+
+    btn.classList.add('loading');
+    btn.disabled = true;
+    errorLine.classList.remove('visible');
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'credenciais inválidas');
+
+      localStorage.setItem('noc_auth_token', data.token);
+      localStorage.setItem('noc_last_login', new Date().toLocaleString('pt-BR'));
+
+      window.location.href = 'index.html';
+    } catch (err) {
+      errorLine.textContent = err.message;
+      errorLine.classList.add('visible');
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  });
+
+  passInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') form.dispatchEvent(new Event('submit'));
+  });
+})();
+</script>
+
+</body>
+</html>
