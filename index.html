@@ -27,9 +27,11 @@
         <button id="btn-clima" title="Camada de Clima" class="tool-btn"><i class="ph ph-cloud-rain" style="font-size: 22px;"></i></button>
         <div style="height: 1px; width: 100%; background: rgba(255,255,255,0.06); margin: 2px 0; border-radius: 1px;"></div>
         <button id="create-route-button" title="Criar Nova Rota" class="tool-btn" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><i class="ph ph-plus-circle" style="font-size: 22px;"></i></button>
+        <button id="btn-aplicar-template" title="Aplicar Template" class="tool-btn" style="color:#a78bfa;"><i class="ph ph-bookmark-simple" style="font-size: 22px;"></i></button>
         <button id="quick-delete-button" title="Modo Exclusão Rápida" class="tool-btn"><i class="ph ph-trash" style="font-size: 22px;"></i></button>
         <button id="open-inventory-button" title="Inventário de Rede" class="tool-btn"><i class="ph ph-hard-drives" style="font-size: 22px;"></i></button>
         <button id="btn-sla" title="SLA · Disponibilidade" class="tool-btn"><i class="ph ph-chart-bar" style="font-size: 22px;"></i></button>
+        <button id="btn-resumo" title="Painel de Rotas" class="tool-btn"><i class="ph ph-list-magnifying-glass" style="font-size: 22px;"></i></button>
         
         <label title="Ímã de Ruas" class="tool-btn"><input type="checkbox" id="snap-to-road-checkbox" style="display: none;"><i class="ph ph-magnet" style="font-size: 22px;"></i></label>
         
@@ -39,6 +41,23 @@
         <button id="btn-logout" title="Sair" class="tool-btn" style="color: #ef4444; display: none;"><i class="ph ph-sign-out" style="font-size: 22px;"></i></button>
     </div>
  
+    <div id="resumo-panel" style="display:none;position:fixed;top:0;left:0;bottom:0;width:340px;z-index:999;background:rgba(15,23,42,0.95);backdrop-filter:blur(16px);border-right:1px solid rgba(255,255,255,0.08);display:none;flex-direction:column;">
+        <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:16px;color:#f8fafc;display:flex;align-items:center;gap:8px;"><i class="ph ph-list-magnifying-glass" style="color:#3b82f6;"></i> Painel de Rotas</h3>
+                <button id="fechar-resumo" class="btn-secondary" style="padding:4px 8px;font-size:16px;margin:0;line-height:1;"><i class="ph ph-x"></i></button>
+            </div>
+            <input id="resumo-busca" type="text" placeholder="Buscar rota..." style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;outline:none;box-sizing:border-box;">
+            <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;" id="resumo-filtros">
+                <button class="resumo-filtro ativo" data-filtro="">Todas</button>
+                <button class="resumo-filtro" data-filtro="up">UP</button>
+                <button class="resumo-filtro" data-filtro="down">DOWN</button>
+                <button class="resumo-filtro" data-filtro="saturado">Saturado</button>
+                <button class="resumo-filtro" data-filtro="manutencao">Manutenção</button>
+            </div>
+        </div>
+        <div id="resumo-lista" style="flex:1;overflow-y:auto;padding:8px;"></div>
+    </div>
     <div id="alarm-panel">
         <div class="alarm-header">
             <div class="alarm-header-left">
@@ -83,6 +102,7 @@
             <div id="hc-maint-row" class="hc-row" style="display:none;"><span class="hc-label"><i class="ph ph-wrench" style="color:#f59e0b"></i> Manutenção</span><span class="hc-value" style="color:#f59e0b; font-weight:700;">ATIVA</span></div>
             <div class="hc-row"><span class="hc-label">Distância Calculada</span><span id="hc-dist" class="hc-value">--</span></div>
             <div class="hc-row"><span class="hc-label">Capacidade Nominal</span><span id="hc-cap" class="hc-value">--</span></div>
+            <div class="hc-row"><span class="hc-label"><i class="ph ph-lightning"></i> Latência</span><span id="hc-latency" class="hc-value">-- ms</span></div>
             <div class="hc-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1);"><span class="hc-label"><i class="ph ph-waveform"></i> Sinal Óptico (RX)</span><span id="hc-rx" class="hc-value" style="font-weight: 700;">-- dBm</span></div>
         </div>
     </div>
@@ -161,6 +181,8 @@
                             <div class="metric-box"><span class="metric-label">Saída (OUT)</span><span class="metric-value" id="kpi-current-out"><span class="empty-pulse">···</span></span></div>
                             <div class="metric-divider"></div>
                             <div class="metric-box"><span class="metric-label">Pico</span><span class="metric-value" id="kpi-peak-traffic"><span class="empty-pulse">···</span></span></div>
+                            <div class="metric-box"><span class="metric-label">Latência</span><span class="metric-value" id="kpi-latency" style="color:#60a5fa;font-size:13px;"><span class="empty-pulse">···</span></span></div>
+                            <div class="metric-box"><span class="metric-label">Jitter</span><span class="metric-value" id="kpi-jitter" style="color:#a78bfa;font-size:13px;"><span class="empty-pulse">···</span></span></div>
                         </div>
                         <div id="sparkline-geral" style="height:40px; margin-top:6px;"></div>
                         <div id="mini-trend-container" style="height:90px; margin:10px 0 4px 0; position:relative;">
@@ -198,6 +220,11 @@
                                 <span id="ui-rx-value" class="rx-value"><span class="empty-pulse">···</span></span>
                             </div>
                         </div>
+                    </div>
+                    <div id="historico-tendencia" style="display:none;">
+                        <div class="metric-divider"></div>
+                        <div style="font-size:10px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px;">Tendência (30d)</div>
+                        <div id="historico-chart" style="height:80px;"></div>
                     </div>
                     <div class="metrics-footer">
                         <span id="last-update-timestamp">--</span>
@@ -369,6 +396,7 @@
 
         <div class="drawer-footer">
             <button id="delete-route-button" class="btn-danger" style="display: none;"><i class="ph ph-trash"></i> Excluir</button>
+            <button id="btn-salvar-template" class="btn-secondary" style="display:none;margin-left:8px;" title="Salvar configuração Zabbix como template"><i class="ph ph-bookmark-simple"></i></button>
             <div class="right-buttons" style="display: flex; gap: 10px; margin-left: auto;">
                 <button id="modal-cancel-button" class="btn-secondary">Cancelar (Esc)</button>
                 <button id="modal-save-button" class="btn-primary">Salvar Rota (Ctrl+Enter)</button>
@@ -521,6 +549,49 @@
             <div id="command-palette-results" style="max-height: 350px; overflow-y: auto; padding: 10px 0;"></div>
         </div>
     </div>
+<div id="template-modal" class="modal-overlay" style="backdrop-filter: blur(4px);">
+    <div class="modal-content premium-modal" style="width: 500px; max-width: 90vw;">
+        <div class="modal-header" style="padding:18px 22px;border-bottom:1px solid #27272a;display:flex;justify-content:space-between;align-items:center;">
+            <h2 style="margin:0;display:flex;align-items:center;gap:8px;color:#f4f4f5;font-size:16px;"><i class="ph ph-bookmark-simple" style="color:#8b5cf6;"></i> <span id="template-modal-title">Salvar como Template</span></h2>
+            <button id="fechar-template-modal" class="btn-secondary" style="padding:4px 8px;margin:0;"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="modal-body" style="padding:20px;">
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px;">Nome do Template</label>
+                <input id="template-nome" type="text" placeholder="Ex: Cliente 100Mbps" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;outline:none;box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px;">Descrição</label>
+                <textarea id="template-descricao" placeholder="Opcional" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;outline:none;box-sizing:border-box;resize:vertical;min-height:60px;font-family:inherit;"></textarea>
+            </div>
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px;">Itens Zabbix a incluir</label>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-in" checked> IN</label>
+                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-out" checked> OUT</label>
+                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-rx" checked> RX</label>
+                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-status" checked> Status</label>
+                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-latency" checked> Latência</label>
+                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-jitter" checked> Jitter</label>
+                </div>
+            </div>
+            <button id="btn-confirmar-template" class="btn-primary" style="width:100%;"><i class="ph ph-check"></i> Salvar Template</button>
+        </div>
+    </div>
+</div>
+
+<div id="aplicar-template-modal" class="modal-overlay" style="backdrop-filter: blur(4px);">
+    <div class="modal-content premium-modal" style="width: 500px; max-width: 90vw;">
+        <div class="modal-header" style="padding:18px 22px;border-bottom:1px solid #27272a;display:flex;justify-content:space-between;align-items:center;">
+            <h2 style="margin:0;display:flex;align-items:center;gap:8px;color:#f4f4f5;font-size:16px;"><i class="ph ph-bookmark-simple" style="color:#3b82f6;"></i> Aplicar Template</h2>
+            <button id="fechar-aplicar-template" class="btn-secondary" style="padding:4px 8px;margin:0;"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="modal-body" style="padding:20px;max-height:50vh;overflow-y:auto;">
+            <div id="lista-templates"></div>
+            <div id="sem-templates" style="display:none;text-align:center;padding:30px;color:#64748b;font-size:13px;">Nenhum template salvo.</div>
+        </div>
+    </div>
+</div>
 <div id="kiosk-overlay">
   <div class="kiosk-header">
     <span class="kiosk-title">NOCULYS.IO · MODO KIOSK</span>

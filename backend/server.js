@@ -153,6 +153,39 @@ async function verificarManutencaoExpirada() {
 setInterval(verificarManutencaoExpirada, MAINT_CHECK_INTERVAL);
 
 // ==========================================
+// 1.6 AMOSTRAGEM DE HISTÓRICO DE TRÁFEGO
+// ==========================================
+const TRAFFIC_SAMPLE_INTERVAL = 5 * 60 * 1000;
+async function amostrarTrafego() {
+  try {
+    const db = require('./db');
+    const [rotas] = await db.execute('SELECT id FROM rotas');
+    for (const rota of rotas) {
+      const cache = await redisClient.hGetAll('zabbix_cache');
+      if (!cache) continue;
+      let inBps = 0, outBps = 0;
+      try {
+        const parsed = JSON.parse(Object.values(cache)[0] || '{}');
+        const [items] = await db.execute('SELECT zabbix_itemid, tipo_item FROM rota_zabbix_items WHERE rota_id = ?', [rota.id]);
+        items.forEach(item => {
+          const val = parseFloat(parsed[item.zabbix_itemid]?.current) || 0;
+          if (item.tipo_item === 'download') inBps += val;
+          if (item.tipo_item === 'upload') outBps += val;
+        });
+      } catch {}
+      await db.execute(
+        'INSERT INTO historico_trafego (rota_id, in_bps, out_bps) VALUES (?, ?, ?)',
+        [rota.id, inBps, outBps]
+      );
+    }
+    logger.debug(`Amostragem de tráfego concluída: ${rotas.length} rotas`);
+  } catch (e) {
+    logger.error('Erro na amostragem de tráfego:', e.message);
+  }
+}
+setInterval(amostrarTrafego, TRAFFIC_SAMPLE_INTERVAL);
+
+// ==========================================
 // 2. ROTAS E CONTROLADORES
 // ==========================================
 require('./routes/auth')(app);
@@ -160,6 +193,8 @@ require('./routes/rotas')(app, io);
 require('./routes/zabbix')(app);
 require('./routes/weather')(app);
 require('./routes/sla')(app);
+require('./routes/historico')(app);
+require('./routes/templates')(app);
 require('./routes/problemas')(app, io);
 require('./routes/swagger')(app);
 

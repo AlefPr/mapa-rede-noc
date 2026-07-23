@@ -101,5 +101,23 @@ export const api = {
             console.error('Falha na API (limparAlarmes):', error);
             throw error;
         }
+    },
+
+    listarTemplates: async () => {
+        const res = await fetch(`${state.API_URL_BASE}/templates`);
+        if (!res.ok) return [];
+        return await res.json();
+    },
+
+    criarTemplate: async (dados) => {
+        const res = await authFetch(`${state.API_URL_BASE}/templates`, {
+            method: 'POST', body: JSON.stringify(dados)
+        });
+        if (!res.ok) throw new Error('Erro ao criar template');
+        return await res.json();
+    },
+
+    excluirTemplate: async (id) => {
+        await authFetch(`${state.API_URL_BASE}/templates/${id}`, { method: 'DELETE' });
     }
 };

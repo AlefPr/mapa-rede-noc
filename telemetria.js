@@ -82,6 +82,17 @@ export const telemetria = {
         if (kpiIn) kpiIn.textContent = formatarAuto(valorIn);
         if (kpiOut) kpiOut.textContent = formatarAuto(valorOut);
 
+        const kpiLat = document.getElementById('kpi-latency');
+        const kpiJitter = document.getElementById('kpi-jitter');
+        if (rota.zabbix_items?.latency) {
+            const vals = rota.zabbix_items.latency.map(id => parseFloat(state.zabbixCacheLocal[id]?.current) || 0).filter(v => v > 0);
+            if (kpiLat) kpiLat.textContent = vals.length > 0 ? vals.join(' / ') + ' ms' : '-- ms';
+        } else if (kpiLat) kpiLat.innerHTML = '<span class="empty-pulse">···</span>';
+        if (rota.zabbix_items?.jitter) {
+            const vals = rota.zabbix_items.jitter.map(id => parseFloat(state.zabbixCacheLocal[id]?.current) || 0).filter(v => v > 0);
+            if (kpiJitter) kpiJitter.textContent = vals.length > 0 ? vals.join(' / ') + ' ms' : '-- ms';
+        } else if (kpiJitter) kpiJitter.innerHTML = '<span class="empty-pulse">···</span>';
+
         let trafegoConsiderado = 0;
         const tipoCalculo = rota.tipo_rota || 'full-duplex';
 
@@ -693,6 +704,41 @@ export const telemetria = {
         } catch (e) {
             console.error('Mini-trend error:', e);
             container.innerHTML = '<div style="color:#ef4444;font-size:11px;text-align:center;padding-top:18px;">Erro ao carregar</div>';
+        }
+    },
+
+    renderHistorico: async (rota) => {
+        const container = document.getElementById('historico-chart');
+        const wrapper = document.getElementById('historico-tendencia');
+        if (!container || !wrapper) return;
+        if (!rota || !rota.id) { wrapper.style.display = 'none'; return; }
+
+        try {
+            const res = await fetch(`${state.API_URL_BASE}/rotas/${rota.id}/historico?dias=30`);
+            const dados = await res.json();
+            if (!dados || dados.length < 2) { wrapper.style.display = 'none'; return; }
+
+            wrapper.style.display = 'block';
+            const inData = dados.map(d => ({ x: new Date(d.timestamp).getTime(), y: +(d.in_bps / 1000000).toFixed(2) }));
+            const outData = dados.map(d => ({ x: new Date(d.timestamp).getTime(), y: +(d.out_bps / 1000000).toFixed(2) }));
+
+            if (state.historicoChartInstance) state.historicoChartInstance.destroy();
+
+            state.historicoChartInstance = new ApexCharts(container, {
+                series: [
+                    { name: 'IN', data: inData },
+                    { name: 'OUT', data: outData }
+                ],
+                chart: { type: 'area', height: 80, sparkline: { enabled: true }, animations: { enabled: false } },
+                stroke: { curve: 'smooth', width: 1.5 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
+                colors: ['#34d399', '#60a5fa'],
+                tooltip: { enabled: true, theme: 'dark', x: { show: true, format: 'dd MMM' }, y: { formatter: v => v.toFixed(1) + ' Mbps' } }
+            });
+            state.historicoChartInstance.render();
+        } catch (e) {
+            console.error('Historico error:', e);
+            wrapper.style.display = 'none';
         }
     }
 };

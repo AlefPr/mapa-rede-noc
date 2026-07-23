@@ -484,6 +484,34 @@ export const ui = {
             if (target.matches('#close-sla-button') || target.closest('#close-sla-button')) {
                 document.getElementById('sla-modal')?.classList.remove('visible');
             }
+            if (target.matches('#btn-resumo') || target.closest('#btn-resumo')) ui.alternarResumo();
+            if (target.matches('#fechar-resumo') || target.closest('#fechar-resumo')) {
+                document.getElementById('resumo-panel').style.display = 'none';
+            }
+
+            // ==========================================
+            // TEMPLATES
+            // ==========================================
+            if (target.matches('#btn-salvar-template') || target.closest('#btn-salvar-template')) {
+                ui.abrirModalSalvarTemplate();
+            }
+            if (target.matches('#btn-aplicar-template') || target.closest('#btn-aplicar-template')) {
+                ui.abrirModalAplicarTemplate();
+            }
+            if (target.matches('#btn-confirmar-template') || target.closest('#btn-confirmar-template')) {
+                ui.salvarTemplate();
+            }
+            if (target.matches('#fechar-template-modal') || target.closest('#fechar-template-modal')) {
+                document.getElementById('template-modal').style.display = 'none';
+            }
+            if (target.matches('#fechar-aplicar-template') || target.closest('#fechar-aplicar-template')) {
+                document.getElementById('aplicar-template-modal').style.display = 'none';
+            }
+            if (target.matches('.btn-aplicar-template-item') || target.closest('.btn-aplicar-template-item')) {
+                const btn = target.closest('.btn-aplicar-template-item');
+                ui.aplicarTemplate(parseInt(btn.dataset.id));
+            }
+
             if (target.matches('#close-inventory-button') || target.closest('#close-inventory-button')) {
                 const modal = document.getElementById('inventory-modal');
                 if (modal) modal.classList.remove('visible');
@@ -545,6 +573,28 @@ export const ui = {
         const dashInput = document.getElementById('route-dash');
         if (glowInput) glowInput.addEventListener('input', () => ui.atualizarLivePreview());
         if (dashInput) dashInput.addEventListener('input', () => ui.atualizarLivePreview());
+
+        document.addEventListener('input', (event) => {
+            if (event.target.id === 'resumo-busca') ui.renderizarResumo();
+        });
+
+        document.addEventListener('click', (event) => {
+            const filtro = event.target.closest('.resumo-filtro');
+            if (filtro) {
+                document.querySelectorAll('.resumo-filtro').forEach(b => b.classList.remove('ativo'));
+                filtro.classList.add('ativo');
+                ui.renderizarResumo();
+            }
+            const card = event.target.closest('.resumo-card');
+            if (card && card.dataset.rotaId) {
+                const rota = state.rotasSalvas.find(r => r.id == card.dataset.rotaId);
+                if (rota) {
+                    ui.esconderHoverCard();
+                    if (typeof mapa.focarRota === 'function') mapa.focarRota(rota);
+                    ui.abrirGaveta(rota);
+                }
+            }
+        });
 
         document.addEventListener('change', (event) => {
             if (event.target.id === 'dark-mode-checkbox') mapa.alternarModoEscuro(event.target.checked);
@@ -857,7 +907,9 @@ export const ui = {
 
         if (rota) {
             if (btnExcluir) btnExcluir.style.display = 'inline-block';
-     
+            const btnTemplate = document.getElementById('btn-salvar-template');
+            if (btnTemplate) btnTemplate.style.display = rota.zabbix_items ? 'inline-flex' : 'none';
+
             const idsInput = {
                 'route-name': rota.nome_rota || '',
                 'route-color': rota.cor || '#3b82f6',
@@ -916,6 +968,9 @@ export const ui = {
 
             if (typeof telemetria.renderizarMiniTrend === 'function') {
                 telemetria.renderizarMiniTrend(rota);
+            }
+            if (typeof telemetria.renderHistorico === 'function') {
+                telemetria.renderHistorico(rota);
             }
 
             // INTELIGÊNCIA GEOGRÁFICA
@@ -1111,6 +1166,19 @@ export const ui = {
             }
         }
 
+        const latencyEl = document.getElementById('hc-latency');
+        if (latencyEl) {
+            if (rota.zabbix_items?.latency) {
+                const vals = rota.zabbix_items.latency.map(id => parseFloat(state.zabbixCacheLocal[id]?.current) || 0).filter(v => v > 0);
+                latencyEl.textContent = vals.length > 0 ? vals.join(' / ') + ' ms' : '-- ms';
+                const media = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+                latencyEl.style.color = media > 100 ? '#ef4444' : media > 50 ? '#f59e0b' : '#60a5fa';
+            } else {
+                latencyEl.textContent = '-- ms';
+                latencyEl.style.color = '#94a3b8';
+            }
+        }
+
         const maintRow = document.getElementById('hc-maint-row');
         if (maintRow) {
             maintRow.style.display = rota.manutencao_ativa ? 'flex' : 'none';
@@ -1281,6 +1349,78 @@ export const ui = {
         } catch (e) {
             console.error('Erro ao carregar timeline:', e);
             list.innerHTML = '<div style="text-align:center;padding:30px;color:#ef4444;font-size:13px;">Erro ao carregar histórico.</div>';
+        }
+    },
+
+    alternarResumo: () => {
+        const panel = document.getElementById('resumo-panel');
+        if (!panel) return;
+        const visivel = panel.style.display !== 'none';
+        panel.style.display = visivel ? 'none' : 'flex';
+        if (!visivel) {
+            ui.renderizarResumo();
+            if (state.map) {
+                google.maps.event.addListenerOnce(state.map, 'click', () => {
+                    panel.style.display = 'none';
+                });
+            }
+        }
+    },
+
+    renderizarResumo: () => {
+        const lista = document.getElementById('resumo-lista');
+        const busca = document.getElementById('resumo-busca')?.value?.toLowerCase() || '';
+        const filtroAtivo = document.querySelector('.resumo-filtro.ativo')?.dataset?.filtro || '';
+        if (!lista || !state.rotasSalvas) return;
+
+        const formatar = (bps) => {
+            if (!bps || bps === 0) return '0 Mbps';
+            if (bps >= 1000000000000) return (bps / 1000000000000).toFixed(1) + ' Tbps';
+            if (bps >= 1000000000) return (bps / 1000000000).toFixed(1) + ' Gbps';
+            return (bps / 1000000).toFixed(1) + ' Mbps';
+        };
+
+        let html = '';
+        let count = 0;
+        state.rotasSalvas.forEach(rota => {
+            if (busca && !rota.nome_rota?.toLowerCase().includes(busca)) return;
+
+            let status = 'up';
+            let badgeText = 'UP';
+            let badgeCor = '#10b981';
+
+            if (rota.manutencao_ativa) {
+                status = 'manutencao'; badgeText = 'MANUT'; badgeCor = '#f59e0b';
+            } else if (rota.corDeAlerta) {
+                if (rota.corDeAlerta === '#FF0000') { status = 'down'; badgeText = 'DOWN'; badgeCor = '#ef4444'; }
+                else if (rota.corDeAlerta === '#FFFF00') { status = 'saturado'; badgeText = 'SATURADO'; badgeCor = '#f97316'; }
+                else if (rota.corDeAlerta === '#8B5CF6') { status = 'alta'; badgeText = 'ALTA CARGA'; badgeCor = '#8b5cf6'; }
+            }
+
+            if (filtroAtivo && status !== filtroAtivo) return;
+
+            let valorIn = 0, valorOut = 0;
+            if (rota.zabbix_items?.in) rota.zabbix_items.in.forEach(id => { if (state.zabbixCacheLocal?.[id]) valorIn += parseFloat(state.zabbixCacheLocal[id].current) || 0; });
+            if (rota.zabbix_items?.out) rota.zabbix_items.out.forEach(id => { if (state.zabbixCacheLocal?.[id]) valorOut += parseFloat(state.zabbixCacheLocal[id].current) || 0; });
+
+            count++;
+            html += `<div class="resumo-card" data-rota-id="${rota.id}">
+                <div class="resumo-cor" style="background:${rota.cor || '#3b82f6'};"></div>
+                <div class="resumo-info">
+                    <div class="resumo-nome">${rota.nome_rota || 'Sem Nome'}</div>
+                    <div class="resumo-stats">
+                        <span class="resumo-stat">⬇ ${formatar(valorIn)}</span>
+                        <span class="resumo-stat">⬆ ${formatar(valorOut)}</span>
+                    </div>
+                </div>
+                <span class="resumo-badge" style="background:${badgeCor}20;color:${badgeCor};">${badgeText}</span>
+            </div>`;
+        });
+
+        if (count === 0) {
+            lista.innerHTML = '<div style="padding:30px;text-align:center;color:#64748b;font-size:13px;">Nenhuma rota encontrada.</div>';
+        } else {
+            lista.innerHTML = html;
         }
     },
 
@@ -1799,6 +1939,118 @@ export const ui = {
         } else {
             badge.style.display = 'none';
             if (btn) { btn.innerHTML = '<i class="ph ph-wrench"></i> Manutenção'; btn.style.background = 'transparent'; btn.style.color = '#a1a1aa'; }
+        }
+    },
+
+    // ==========================================
+    // TEMPLATES DE ROTAS
+    // ==========================================
+    abrirModalSalvarTemplate: () => {
+        const modal = document.getElementById('template-modal');
+        if (!modal) return;
+        document.getElementById('template-modal-title').textContent = 'Salvar como Template';
+        document.getElementById('template-nome').value = '';
+        document.getElementById('template-descricao').value = '';
+        const rota = state.rotaSelecionada;
+        if (rota?.zabbix_items) {
+            document.getElementById('tmp-inc-in').checked = !!rota.zabbix_items.in?.length;
+            document.getElementById('tmp-inc-out').checked = !!rota.zabbix_items.out?.length;
+            document.getElementById('tmp-inc-rx').checked = !!rota.zabbix_items.rx?.length;
+            document.getElementById('tmp-inc-status').checked = !!rota.zabbix_items.status?.length;
+            document.getElementById('tmp-inc-latency').checked = !!rota.zabbix_items.latency?.length;
+            document.getElementById('tmp-inc-jitter').checked = !!rota.zabbix_items.jitter?.length;
+        }
+        modal.style.display = 'flex';
+    },
+
+    salvarTemplate: async () => {
+        const nome = document.getElementById('template-nome').value.trim();
+        if (!nome) { ui.mostrarToast('Informe um nome para o template.', 'error'); return; }
+        const descricao = document.getElementById('template-descricao').value.trim();
+        const rota = state.rotaSelecionada;
+        if (!rota?.zabbix_items) { ui.mostrarToast('Nenhum item Zabbix na rota atual.', 'error'); return; }
+        const itens_zabbix = {};
+        if (document.getElementById('tmp-inc-in').checked && rota.zabbix_items.in?.length) itens_zabbix.in = rota.zabbix_items.in;
+        if (document.getElementById('tmp-inc-out').checked && rota.zabbix_items.out?.length) itens_zabbix.out = rota.zabbix_items.out;
+        if (document.getElementById('tmp-inc-rx').checked && rota.zabbix_items.rx?.length) itens_zabbix.rx = rota.zabbix_items.rx;
+        if (document.getElementById('tmp-inc-status').checked && rota.zabbix_items.status?.length) itens_zabbix.status = rota.zabbix_items.status;
+        if (document.getElementById('tmp-inc-latency').checked && rota.zabbix_items.latency?.length) itens_zabbix.latency = rota.zabbix_items.latency;
+        if (document.getElementById('tmp-inc-jitter').checked && rota.zabbix_items.jitter?.length) itens_zabbix.jitter = rota.zabbix_items.jitter;
+        try {
+            await api.criarTemplate({ nome, descricao, itens_zabbix });
+            document.getElementById('template-modal').style.display = 'none';
+            ui.mostrarToast('Template salvo com sucesso!', 'success');
+        } catch (e) {
+            ui.mostrarToast('Erro ao salvar template.', 'error');
+        }
+    },
+
+    abrirModalAplicarTemplate: async () => {
+        const modal = document.getElementById('aplicar-template-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        const container = document.getElementById('lista-templates');
+        const emptyMsg = document.getElementById('sem-templates');
+        if (!container) return;
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;"><i class="ph ph-spinner ph-spin" style="font-size:24px;"></i></div>';
+        try {
+            const templates = await api.listarTemplates();
+            if (!templates || templates.length === 0) {
+                if (emptyMsg) emptyMsg.style.display = 'block';
+                container.innerHTML = '';
+                return;
+            }
+            if (emptyMsg) emptyMsg.style.display = 'none';
+            container.innerHTML = templates.map(t => `
+                <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:14px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.06);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="font-size:14px;font-weight:600;color:#e2e8f0;">${t.nome}</div>
+                            ${t.descricao ? '<div style="font-size:12px;color:#64748b;margin-top:2px;">' + t.descricao + '</div>' : ''}
+                            <div style="font-size:11px;color:#52525b;margin-top:4px;">
+                                ${(() => { const info = []; try { const itens = typeof t.itens_zabbix === 'string' ? JSON.parse(t.itens_zabbix) : t.itens_zabbix; if (itens) { Object.keys(itens).forEach(k => info.push(k)); } } catch(e){} return info.join(' · ') || 'sem itens'; })()}
+                            </div>
+                        </div>
+                        <button class="btn-aplicar-template-item btn-secondary" data-id="${t.id}" style="padding:6px 14px;font-size:12px;flex-shrink:0;">Aplicar</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#ef4444;">Erro ao carregar templates.</div>';
+        }
+    },
+
+    aplicarTemplate: async (templateId) => {
+        try {
+            const templates = await api.listarTemplates();
+            const t = templates.find(x => x.id === templateId);
+            if (!t) { ui.mostrarToast('Template não encontrado.', 'error'); return; }
+            let itens = t.itens_zabbix;
+            if (typeof itens === 'string') itens = JSON.parse(itens);
+            if (!itens || Object.keys(itens).length === 0) { ui.mostrarToast('Template vazio.', 'error'); return; }
+
+            const rota = state.rotaSelecionada;
+            if (!rota) {
+                const nome = document.getElementById('route-name')?.value?.trim();
+                const dados = {
+                    nome_rota: nome || 'Nova Rota (template)',
+                    zabbix_items: itens,
+                    lat: state.mapa?.getCenter?.()?.lat() || -23.5505,
+                    lng: state.mapa?.getCenter?.()?.lng() || -46.6333
+                };
+                await api.salvarRota(dados);
+                ui.mostrarToast('Rota criada a partir do template!', 'success');
+            } else {
+                const zabbix_items = { ...(rota.zabbix_items || {}) };
+                Object.assign(zabbix_items, itens);
+                await api.atualizarRota(rota.id, { zabbix_items });
+                ui.mostrarToast('Template aplicado à rota atual!', 'success');
+            }
+            document.getElementById('aplicar-template-modal').style.display = 'none';
+            await state.carregarRotas();
+            mapa.renderizarRotas(state.rotasSalvas);
+        } catch (e) {
+            ui.mostrarToast('Erro ao aplicar template.', 'error');
         }
     }
 };

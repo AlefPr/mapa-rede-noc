@@ -13,6 +13,7 @@ export const state = {
     minimapPolyline: null,
     minimapPolylineGlow: null,
     miniTrendChart: null,
+    historicoChartInstance: null,
     
     // Dados de Rotas
     rotasSalvas: [],

@@ -70,6 +70,8 @@ export const incidentes = {
                 if (typeof mapa.atualizarCoresDeSaude === 'function') {
                     mapa.atualizarCoresDeSaude();
                 }
+                const panelVisivel = document.getElementById('resumo-panel')?.style.display !== 'none';
+                if (panelVisivel && typeof ui.renderizarResumo === 'function') ui.renderizarResumo();
                 const drawerOpen = document.getElementById('route-drawer')?.classList.contains('open');
                 if (drawerOpen && state.rotaSelecionada) {
                     if (typeof telemetria.atualizarPainelSaude === 'function') {
@@ -77,6 +79,9 @@ export const incidentes = {
                     }
                     if (typeof telemetria.renderizarMiniTrend === 'function') {
                         telemetria.renderizarMiniTrend(state.rotaSelecionada);
+                    }
+                    if (typeof telemetria.renderHistorico === 'function') {
+                        telemetria.renderHistorico(state.rotaSelecionada);
                     }
                 }
             });

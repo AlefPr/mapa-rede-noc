@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS historico_trafego (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  rota_id INT NOT NULL,
+  in_bps DOUBLE DEFAULT 0,
+  out_bps DOUBLE DEFAULT 0,
+  timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_rota_timestamp (rota_id, timestamp)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

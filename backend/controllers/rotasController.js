@@ -7,18 +7,20 @@ exports.listarRotas = async (req, res) => {
     const [allItemRows] = await db.execute('SELECT * FROM rota_zabbix_items');
     
     const itemsByRota = {};
-    allItemRows.forEach(item => {
-        if (!itemsByRota[item.rota_id]) {
-            itemsByRota[item.rota_id] = { in: [], out: [], status: [], rx: [] };
-        }
-        
-        switch(item.tipo_item) {
-            case 'download': itemsByRota[item.rota_id].in.push(item.zabbix_itemid); break;
-            case 'upload':   itemsByRota[item.rota_id].out.push(item.zabbix_itemid); break;
-            case 'status':   itemsByRota[item.rota_id].status.push(item.zabbix_itemid); break;
-            case 'rx':       itemsByRota[item.rota_id].rx.push(item.zabbix_itemid); break;
-        }
-    });
+        allItemRows.forEach(item => {
+            if (!itemsByRota[item.rota_id]) {
+                itemsByRota[item.rota_id] = { in: [], out: [], status: [], rx: [], latency: [], jitter: [] };
+            }
+            
+            switch(item.tipo_item) {
+                case 'download': itemsByRota[item.rota_id].in.push(item.zabbix_itemid); break;
+                case 'upload':   itemsByRota[item.rota_id].out.push(item.zabbix_itemid); break;
+                case 'status':   itemsByRota[item.rota_id].status.push(item.zabbix_itemid); break;
+                case 'rx':       itemsByRota[item.rota_id].rx.push(item.zabbix_itemid); break;
+                case 'latency':  itemsByRota[item.rota_id].latency.push(item.zabbix_itemid); break;
+                case 'jitter':   itemsByRota[item.rota_id].jitter.push(item.zabbix_itemid); break;
+            }
+        });
 
     rotas.forEach(rota => {
         rota.zabbix_items = itemsByRota[rota.id] || { in: [], out: [], status: [], rx: [] };
@@ -34,7 +36,7 @@ exports.listarRotas = async (req, res) => {
 exports.criarRota = async (req, res, io) => {
   let connection;
   try {
-    const { nome, cor, espessura, coordenadas, tipo_rota, capacidade, unidade, itemsIn, itemsOut, itemsStatus, estilo, itemsRx } = req.body;
+    const { nome, cor, espessura, coordenadas, tipo_rota, capacidade, unidade, itemsIn, itemsOut, itemsStatus, estilo, itemsRx, itemsLatency, itemsJitter } = req.body;
     
     const vCapacidade = (capacidade === "" || capacidade === undefined) ? null : capacidade;
     const vUnidade = (unidade === "" || unidade === undefined) ? 'Gbps' : unidade;
@@ -62,6 +64,8 @@ exports.criarRota = async (req, res, io) => {
     (itemsOut || []).forEach(id => { if(id) itemsParaSalvar.push([insertId, id, 'upload']) });
     (itemsStatus || []).forEach(id => { if(id) itemsParaSalvar.push([insertId, id, 'status']) });
     (itemsRx || []).forEach(id => { if(id) itemsParaSalvar.push([insertId, id, 'rx']) });
+    (itemsLatency || []).forEach(id => { if(id) itemsParaSalvar.push([insertId, id, 'latency']) });
+    (itemsJitter || []).forEach(id => { if(id) itemsParaSalvar.push([insertId, id, 'jitter']) });
 
     if (itemsParaSalvar.length > 0) {
         await connection.query(sqlItems, [itemsParaSalvar]);
@@ -76,7 +80,9 @@ exports.criarRota = async (req, res, io) => {
         in: itemsSalvos.filter(i => i.tipo_item === 'download').map(i => i.zabbix_itemid),
         out: itemsSalvos.filter(i => i.tipo_item === 'upload').map(i => i.zabbix_itemid),
         status: itemsSalvos.filter(i => i.tipo_item === 'status').map(i => i.zabbix_itemid),
-        rx: itemsSalvos.filter(i => i.tipo_item === 'rx').map(i => i.zabbix_itemid) 
+        rx: itemsSalvos.filter(i => i.tipo_item === 'rx').map(i => i.zabbix_itemid),
+        latency: itemsSalvos.filter(i => i.tipo_item === 'latency').map(i => i.zabbix_itemid),
+        jitter: itemsSalvos.filter(i => i.tipo_item === 'jitter').map(i => i.zabbix_itemid)
     };
     
     io.emit('rotaCriada', rotaSalva[0]);
@@ -96,7 +102,7 @@ exports.atualizarRota = async (req, res, io) => {
   let connection;
   try {
     const { id } = req.params;
-    const { nome, cor, espessura, tipo_rota, capacidade, unidade, itemsIn, itemsOut, itemsStatus, estilo, itemsRx } = req.body;
+    const { nome, cor, espessura, tipo_rota, capacidade, unidade, itemsIn, itemsOut, itemsStatus, estilo, itemsRx, itemsLatency, itemsJitter } = req.body;
     
     const vNome = nome || 'Rota Sem Nome';
     const vCor = cor || '#007bff';
@@ -121,6 +127,8 @@ exports.atualizarRota = async (req, res, io) => {
     (itemsOut || []).forEach(itemId => { if(itemId) itemsParaSalvar.push([id, itemId, 'upload']) });
     (itemsStatus || []).forEach(itemId => { if(itemId) itemsParaSalvar.push([id, itemId, 'status']) });
     (itemsRx || []).forEach(itemId => { if(itemId) itemsParaSalvar.push([id, itemId, 'rx']) });
+    (itemsLatency || []).forEach(itemId => { if(itemId) itemsParaSalvar.push([id, itemId, 'latency']) });
+    (itemsJitter || []).forEach(itemId => { if(itemId) itemsParaSalvar.push([id, itemId, 'jitter']) });
     
     if (itemsParaSalvar.length > 0) {
       await connection.query(sqlItems, [itemsParaSalvar]);
@@ -135,7 +143,9 @@ exports.atualizarRota = async (req, res, io) => {
         in: itemsAtualizados.filter(i => i.tipo_item === 'download').map(i => i.zabbix_itemid),
         out: itemsAtualizados.filter(i => i.tipo_item === 'upload').map(i => i.zabbix_itemid),
         status: itemsAtualizados.filter(i => i.tipo_item === 'status').map(i => i.zabbix_itemid),
-        rx: itemsAtualizados.filter(i => i.tipo_item === 'rx').map(i => i.zabbix_itemid)
+        rx: itemsAtualizados.filter(i => i.tipo_item === 'rx').map(i => i.zabbix_itemid),
+        latency: itemsAtualizados.filter(i => i.tipo_item === 'latency').map(i => i.zabbix_itemid),
+        jitter: itemsAtualizados.filter(i => i.tipo_item === 'jitter').map(i => i.zabbix_itemid)
     };
     
     io.emit('rotaAtualizada', rotaAtualizada[0]);

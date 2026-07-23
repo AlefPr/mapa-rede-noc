@@ -1244,6 +1244,68 @@ html, body {
     box-shadow: 0 0 12px rgba(2,132,199,0.4);
 }
 
+/* ── Resumo Panel ── */
+#resumo-panel { display: flex !important; }
+.resumo-filtro {
+    background: rgba(255,255,255,0.05);
+    color: #94a3b8;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 3px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.15s;
+    letter-spacing: 0.3px;
+}
+.resumo-filtro.ativo { background: #3b82f6; color: white; border-color: #3b82f6; }
+.resumo-filtro:hover:not(.ativo) { background: rgba(255,255,255,0.1); }
+.resumo-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.resumo-card:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); }
+.resumo-cor {
+    width: 10px;
+    height: 38px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.resumo-info { flex: 1; min-width: 0; }
+.resumo-nome {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.resumo-stats {
+    display: flex;
+    gap: 8px;
+    margin-top: 3px;
+    font-size: 10px;
+    color: #64748b;
+}
+.resumo-stat { font-family: 'JetBrains Mono', monospace; }
+.resumo-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+}
+.kiosk-mode #resumo-panel { display: none !important; }
+
 /* ── Kiosk Mode ── */
 #kiosk-overlay {
     display: none;
