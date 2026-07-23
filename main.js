@@ -29,6 +29,7 @@ async function initApp() {
   try {
     const valido = await auth.verify();
     if (!valido) {
+      ui.configurarAuthUI();
       ui.mostrarLogin();
       return;
     }

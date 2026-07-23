@@ -1847,6 +1847,8 @@ export const ui = {
     },
 
     configurarAuthUI: () => {
+        if (ui._authUiReady) return;
+        ui._authUiReady = true;
         const btnLogin = document.getElementById('btn-login');
         const btnLogout = document.getElementById('btn-logout');
         const loginOverlay = document.getElementById('login-overlay');
