@@ -25,56 +25,65 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-const valido = await auth.verify();
-if (valido) {
-  ui.atualizarEstadoAuth();
-  await loadGoogleMaps();
-  console.log("🚀 A inicializar Sistema NOC Premium...");
-  mapa.init();
-  ui.init();
-  incidentes.init();
+async function initApp() {
   try {
-    const rotas = await api.getRotas();
-    state.rotasSalvas = rotas;
-    mapa.renderizarRotasNoMapa(state.rotasSalvas);
-    if (typeof mapa.atualizarCoresDeSaude === 'function') {
-      mapa.atualizarCoresDeSaude();
+    const valido = await auth.verify();
+    if (!valido) {
+      window.location.href = 'login.html';
+      return;
     }
-    console.log(`✅ ${rotas.length} rotas carregadas.`);
+    ui.atualizarEstadoAuth();
+    await loadGoogleMaps();
+    console.log("🚀 A inicializar Sistema NOC Premium...");
+    mapa.init();
+    ui.init();
+    incidentes.init();
+    try {
+      const rotas = await api.getRotas();
+      state.rotasSalvas = rotas;
+      mapa.renderizarRotasNoMapa(state.rotasSalvas);
+      if (typeof mapa.atualizarCoresDeSaude === 'function') {
+        mapa.atualizarCoresDeSaude();
+      }
+      console.log(`✅ ${rotas.length} rotas carregadas.`);
 
-    if (typeof ui.renderizarResumo === 'function') ui.renderizarResumo();
+      if (typeof ui.renderizarResumo === 'function') ui.renderizarResumo();
 
-    // Kiosk Mode
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('kiosk') === 'true') {
-      document.body.classList.add('kiosk-mode');
-      const kioskInfo = document.getElementById('kiosk-info');
-      const kioskClock = document.getElementById('kiosk-clock');
+      // Kiosk Mode
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('kiosk') === 'true') {
+        document.body.classList.add('kiosk-mode');
+        const kioskInfo = document.getElementById('kiosk-info');
+        const kioskClock = document.getElementById('kiosk-clock');
 
-      let kioskIdx = 0;
-      setInterval(() => {
-        const problemasContainer = document.getElementById('alarm-list');
-        if (problemasContainer) {
-          const ativos = problemasContainer.querySelectorAll('.incident-card.active');
-          if (ativos.length > 0) {
-            const ativosArr = Array.from(ativos);
-            if (kioskIdx >= ativosArr.length) kioskIdx = 0;
-            const nome = ativosArr[kioskIdx]?.querySelector('.incident-card-name')?.textContent?.trim();
-            const rota = state.rotasSalvas.find(r => nome && r.nome_rota === nome);
-            if (rota && rota.coordenadas && typeof mapa.focarRota === 'function') {
-              mapa.focarRota(rota);
+        let kioskIdx = 0;
+        setInterval(() => {
+          const problemasContainer = document.getElementById('alarm-list');
+          if (problemasContainer) {
+            const ativos = problemasContainer.querySelectorAll('.incident-card.active');
+            if (ativos.length > 0) {
+              const ativosArr = Array.from(ativos);
+              if (kioskIdx >= ativosArr.length) kioskIdx = 0;
+              const nome = ativosArr[kioskIdx]?.querySelector('.incident-card-name')?.textContent?.trim();
+              const rota = state.rotasSalvas.find(r => nome && r.nome_rota === nome);
+              if (rota && rota.coordenadas && typeof mapa.focarRota === 'function') {
+                mapa.focarRota(rota);
+              }
+              kioskIdx++;
             }
-            kioskIdx++;
           }
-        }
-        if (kioskClock) {
-          kioskClock.textContent = new Date().toLocaleTimeString('pt-BR');
-        }
-      }, 15000);
+          if (kioskClock) {
+            kioskClock.textContent = new Date().toLocaleTimeString('pt-BR');
+          }
+        }, 15000);
+      }
+    } catch (error) {
+      console.error("❌ Erro ao carregar rotas:", error);
     }
   } catch (error) {
-    console.error("❌ Erro ao carregar rotas:", error);
+    console.error("❌ Erro na inicialização:", error);
+    alert('Erro ao carregar o mapa. Verifique o console (F12) para detalhes.');
   }
-} else {
-  window.location.href = 'login.html';
 }
+
+initApp();

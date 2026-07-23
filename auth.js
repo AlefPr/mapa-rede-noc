@@ -72,12 +72,13 @@ export const auth = {
 
   async verify() {
     const token = this.getToken();
-    if (!token) return false;
+    if (!token) { console.warn('auth.verify: sem token'); return false; }
     try {
       const res = await fetch(`${state.API_URL_BASE}/auth/verificar`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) {
+        console.warn('auth.verify: token rejeitado', res.status);
         this.setToken(null);
         return false;
       }
@@ -86,7 +87,8 @@ export const auth = {
       state.usuario = data.usuario;
       state.autenticado = true;
       return true;
-    } catch {
+    } catch (err) {
+      console.warn('auth.verify: exceção', err);
       return false;
     }
   }
