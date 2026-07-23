@@ -119,4 +119,6 @@ module.exports = (app, io) => {
    *       404: { description: Rota não encontrada }
    */
   app.post('/api/rotas/:id/manutencao', autenticarToken, (req, res) => rotasController.toggleManutencao(req, res, io));
+
+  app.get('/api/rotas/:id/timeline', autenticarTokenOpcional, rotasController.timelineIncidentes);
 };

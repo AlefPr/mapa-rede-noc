@@ -621,5 +621,78 @@ export const telemetria = {
 
         state.sparklineChartInstance = new ApexCharts(container, options);
         state.sparklineChartInstance.render();
+    },
+
+    renderizarMiniTrend: async (rota) => {
+        const container = document.getElementById('mini-trend-chart');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (!rota || !rota.zabbix_items || (!rota.zabbix_items.in.length && !rota.zabbix_items.out.length)) {
+            container.innerHTML = '<div style="color:#64748b;font-size:11px;text-align:center;padding-top:18px;">Configure interfaces Zabbix para ver tendência</div>';
+            return;
+        }
+
+        try {
+            const allIds = [...(rota.zabbix_items.in || []), ...(rota.zabbix_items.out || [])];
+            const idsStr = allIds.map(id => `itemids=${id}`).join('&');
+            const res = await fetch(`${state.API_URL_BASE}/zabbix/items/history?${idsStr}&period=6h`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+
+            const inIds = new Set(rota.zabbix_items.in || []);
+            const outIds = new Set(rota.zabbix_items.out || []);
+
+            const aggregated = {};
+            (data || []).forEach(p => {
+                if (!aggregated[p.clock]) aggregated[p.clock] = { in: 0, out: 0 };
+                const id = String(p.itemid);
+                const val = parseFloat(p.value) || 0;
+                if (inIds.has(id)) aggregated[p.clock].in += val;
+                if (outIds.has(id)) aggregated[p.clock].out += val;
+            });
+
+            const sorted = Object.entries(aggregated).sort((a, b) => a[0] - b[0]);
+            const inData = sorted.map(([, v]) => +(v.in / 1000000).toFixed(2));
+            const outData = sorted.map(([, v]) => +(v.out / 1000000).toFixed(2));
+
+            if (inData.length < 2 && outData.length < 2) {
+                container.innerHTML = '<div style="color:#64748b;font-size:11px;text-align:center;padding-top:18px;">Aguardar dados de histórico...</div>';
+                return;
+            }
+
+            if (state.miniTrendChart) state.miniTrendChart.destroy();
+
+            state.miniTrendChart = new ApexCharts(container, {
+                series: [
+                    { name: 'IN', data: inData },
+                    { name: 'OUT', data: outData }
+                ],
+                chart: {
+                    type: 'area',
+                    height: 72,
+                    sparkline: { enabled: true },
+                    animations: { enabled: false }
+                },
+                stroke: { curve: 'smooth', width: 1.5 },
+                fill: {
+                    type: 'gradient',
+                    gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 100] }
+                },
+                colors: ['#34d399', '#60a5fa'],
+                tooltip: {
+                    enabled: true,
+                    theme: 'dark',
+                    x: { show: true },
+                    y: {
+                        formatter: (v) => v.toFixed(2) + ' Mbps'
+                    }
+                }
+            });
+            state.miniTrendChart.render();
+        } catch (e) {
+            console.error('Mini-trend error:', e);
+            container.innerHTML = '<div style="color:#ef4444;font-size:11px;text-align:center;padding-top:18px;">Erro ao carregar</div>';
+        }
     }
 };

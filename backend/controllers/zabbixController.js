@@ -32,14 +32,17 @@ exports.getHostItems = async (req, res) => {
 exports.getItemLinks = async (req, res) => {
   try {
     const items = await zabbixService.zabbixApiCall('item.get', { output: ['itemid'], itemids: req.params.itemId, selectHosts: ['hostid'] });
-    const hostId = items[0].hosts[0].hostid;
+    if (!items || items.length === 0) return res.status(404).json({ error: 'Item não encontrado no Zabbix' });
+    const hostId = items[0].hosts?.[0]?.hostid;
+    if (!hostId) return res.status(404).json({ error: 'Host não encontrado para este item' });
     const hosts = await zabbixService.zabbixApiCall('host.get', { output: ['hostid'], hostids: hostId, selectGroups: ['groupid'] });
-    res.json({ itemid: items[0].itemid, hosts: [{ hostid: hostId }], groups: hosts[0].groups });
+    res.json({ itemid: items[0].itemid, hosts: [{ hostid: hostId }], groups: hosts[0]?.groups || [] });
   } catch (error) { logger.error('Erro ao obter vinculos do item:', error); res.status(500).json({ error: 'Erro ao obter vinculos do item' }); }
 };
 
 exports.getItemHistory = async (req, res) => {
-  const itemIds = req.query.itemids ? req.query.itemids.split(',') : [];
+  const raw = req.query.itemids;
+  const itemIds = raw ? (Array.isArray(raw) ? raw : raw.split(',')) : [];
   if (!itemIds.length) return res.json({ value: 0 });
   try {
     const result = await zabbixService.zabbixApiCall('history.get', { output: ['value'], history: 3, itemids: itemIds, sortfield: 'clock', sortorder: 'DESC', limit: itemIds.length });
@@ -48,22 +51,26 @@ exports.getItemHistory = async (req, res) => {
 };
 
 exports.getItemHistoryDetailed = async (req, res) => {
-  const period = req.query.period || '1h'; 
-  const valueType = req.query.value_type; 
-  const historyType = valueType !== undefined ? parseInt(valueType) : 3; 
+  const period = req.query.period || '1h';
+  const valueType = req.query.value_type;
+  const historyType = valueType !== undefined ? parseInt(valueType) : 3;
+
+  const raw = req.query.itemids || req.params.itemId;
+  const itemIds = raw ? (Array.isArray(raw) ? raw : raw.split(',')) : [];
+  if (!itemIds.length) return res.json([]);
 
   try {
     const now = Math.floor(Date.now() / 1000);
     const times = { '30m': 1800, '1h': 3600, '6h': 21600, '24h': 86400, '7d': 604800 };
     const time_from = now - (times[period] || 3600);
-    
-    const result = await zabbixService.zabbixApiCall('history.get', { 
-        output: ['clock', 'value'], 
-        history: historyType,  
-        itemids: [req.params.itemId], 
-        sortfield: 'clock', 
-        sortorder: 'ASC', 
-        time_from 
+
+    const result = await zabbixService.zabbixApiCall('history.get', {
+        output: ['clock', 'value'],
+        history: historyType,
+        itemids: itemIds,
+        sortfield: 'clock',
+        sortorder: 'ASC',
+        time_from
     });
     res.json(result);
   } catch (error) { logger.error('Erro ao buscar historico:', error); res.status(500).json({ error: 'Erro ao buscar historico' }); }

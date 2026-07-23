@@ -15,7 +15,6 @@ const zabbixService = require('./services/zabbixService');
 const redisClient = require('./redisClient');
 const logger = require('./logger');
 const { errorHandler } = require('./middleware/errorHandler');
-const { verificarCookie } = require('./middleware/auth');
 
 const FRONTEND_DIR = '/var/www/html/mapa';
 
@@ -101,10 +100,6 @@ app.get('/mapa/health', async (req, res) => {
   res.json(health);
 });
 
-app.use('/mapa', (req, res, next) => {
-  if (req.path === '/login.html' || req.path === '/health') return next();
-  verificarCookie(req, res, next);
-});
 app.use('/mapa', express.static(FRONTEND_DIR));
 
 const limiter = rateLimit({
@@ -132,11 +127,39 @@ io.on('connection', (socket) => {
 app.get('/', (req, res) => res.json({ message: "API OK!" }));
 
 // ==========================================
+// 1.5 MOTOR DE EXPIRAÇÃO DE MANUTENÇÃO
+// ==========================================
+const MAINT_CHECK_INTERVAL = 60000;
+async function verificarManutencaoExpirada() {
+  try {
+    const db = require('./db');
+    const [expiradas] = await db.execute(
+      'SELECT id, nome_rota FROM rotas WHERE manutencao_ativa = 1 AND manutencao_ate IS NOT NULL AND manutencao_ate <= NOW()'
+    );
+    for (const rota of expiradas) {
+      await db.execute('UPDATE rotas SET manutencao_ativa = 0, manutencao_ate = NULL WHERE id = ?', [rota.id]);
+      io.emit('rotaManutencaoAtualizada', {
+        id: rota.id,
+        nome_rota: rota.nome_rota,
+        manutencao_ativa: false,
+        manutencao_ate: null
+      });
+      logger.info(`Manutenção expirada automaticamente: ${rota.nome_rota} (ID: ${rota.id})`);
+    }
+  } catch (e) {
+    logger.error('Erro ao verificar manutenções expiradas:', e);
+  }
+}
+setInterval(verificarManutencaoExpirada, MAINT_CHECK_INTERVAL);
+
+// ==========================================
 // 2. ROTAS E CONTROLADORES
 // ==========================================
 require('./routes/auth')(app);
 require('./routes/rotas')(app, io);
 require('./routes/zabbix')(app);
+require('./routes/weather')(app);
+require('./routes/sla')(app);
 require('./routes/problemas')(app, io);
 require('./routes/swagger')(app);
 

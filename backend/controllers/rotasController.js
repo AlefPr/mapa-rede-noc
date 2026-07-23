@@ -177,6 +177,26 @@ exports.toggleManutencao = async (req, res, io) => {
   }
 };
 
+exports.timelineIncidentes = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const dias = parseInt(req.query.dias) || 7;
+    const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+
+    const [problemas] = await db.execute(
+      `SELECT p.id, p.descricao, p.severidade, p.status, p.data_inicio, p.data_fim
+       FROM problemas p WHERE p.rota_id = ? AND p.data_inicio >= ?
+       ORDER BY p.data_inicio DESC`,
+      [id, desde]
+    );
+
+    res.json(problemas);
+  } catch (error) {
+    logger.error('Erro ao buscar timeline:', error);
+    res.status(500).json({ error: 'Erro ao buscar timeline' });
+  }
+};
+
 exports.excluirRota = async (req, res, io) => {
   try {
     const { id } = req.params;

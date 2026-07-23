@@ -71,8 +71,13 @@ export const incidentes = {
                     mapa.atualizarCoresDeSaude();
                 }
                 const drawerOpen = document.getElementById('route-drawer')?.classList.contains('open');
-                if (drawerOpen && state.rotaSelecionada && typeof telemetria.atualizarPainelSaude === 'function') {
-                    telemetria.atualizarPainelSaude(state.rotaSelecionada);
+                if (drawerOpen && state.rotaSelecionada) {
+                    if (typeof telemetria.atualizarPainelSaude === 'function') {
+                        telemetria.atualizarPainelSaude(state.rotaSelecionada);
+                    }
+                    if (typeof telemetria.renderizarMiniTrend === 'function') {
+                        telemetria.renderizarMiniTrend(state.rotaSelecionada);
+                    }
                 }
             });
         }

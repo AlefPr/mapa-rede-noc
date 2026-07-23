@@ -99,6 +99,11 @@ export const ui = {
                 ui.mostrarToast("Modo Desenho Ativo. Clique no mapa para traçar.", "info");
             }
 
+            if (target.matches('#btn-clima') || target.closest('#btn-clima')) {
+                const { clima } = await import('./clima.js');
+                clima.toggle();
+            }
+
             if (target.matches('#quick-delete-button') || target.closest('#quick-delete-button')) {
                 if (state.isDrawing) return;
                 state.isQuickDeleting = !state.isQuickDeleting;
@@ -323,21 +328,33 @@ export const ui = {
             }
 
             if (target.matches('.period-button')) {
-                document.querySelectorAll('.period-button').forEach(btn => {
-                    btn.classList.remove('active');
-                    btn.style.background = 'transparent';
-                    btn.style.color = '#94a3b8';
-                });
-                target.classList.add('active');
-                target.style.background = '#3b82f6';
-                target.style.color = 'white';
+                const isWideChart = target.closest('#traffic-analysis-modal');
+                if (isWideChart) {
+                    document.querySelectorAll('#traffic-analysis-modal .period-button').forEach(btn => {
+                        btn.classList.remove('active');
+                        btn.style.background = 'transparent';
+                        btn.style.color = '#94a3b8';
+                    });
+                    target.classList.add('active');
+                    target.style.background = '#3b82f6';
+                    target.style.color = 'white';
 
-                const period = target.getAttribute('data-period');
-                const checks = Array.from(document.querySelectorAll('.iface-check:checked')).map(cb => cb.value);
-                const ativos = checks.length > 0 ? checks : ['0'];
-
-                const dicionario = state.rotaSelecionada && state.rotaSelecionada.nomesResolvidos ? state.rotaSelecionada.nomesResolvidos : {};
-                telemetria.renderizarWideChart(state.rotaSelecionada, period, ativos, dicionario);
+                    const period = target.getAttribute('data-period');
+                    const checks = Array.from(document.querySelectorAll('.iface-check:checked')).map(cb => cb.value);
+                    const ativos = checks.length > 0 ? checks : ['0'];
+                    const dicionario = state.rotaSelecionada && state.rotaSelecionada.nomesResolvidos ? state.rotaSelecionada.nomesResolvidos : {};
+                    telemetria.renderizarWideChart(state.rotaSelecionada, period, ativos, dicionario);
+                } else if (target.hasAttribute('data-tl-period')) {
+                    document.querySelectorAll('[data-tl-period]').forEach(b => {
+                        b.classList.remove('active');
+                        b.style.background = 'transparent';
+                        b.style.color = '#94a3b8';
+                    });
+                    target.classList.add('active');
+                    target.style.background = '#3b82f6';
+                    target.style.color = 'white';
+                    ui.renderizarTimeline();
+                }
             }
 
             // ==========================================
@@ -365,6 +382,9 @@ export const ui = {
 
                 if (targetId === 'tab-aparencia') {
                     setTimeout(() => ui.atualizarLivePreview(), 50);
+                }
+                if (targetId === 'tab-timeline') {
+                    setTimeout(() => ui.renderizarTimeline(), 50);
                 }
             }
 
@@ -460,6 +480,10 @@ export const ui = {
             }
 
             if (target.matches('#open-inventory-button') || target.closest('#open-inventory-button')) ui.abrirModalInventario();
+            if (target.matches('#btn-sla') || target.closest('#btn-sla')) ui.abrirModalSLA();
+            if (target.matches('#close-sla-button') || target.closest('#close-sla-button')) {
+                document.getElementById('sla-modal')?.classList.remove('visible');
+            }
             if (target.matches('#close-inventory-button') || target.closest('#close-inventory-button')) {
                 const modal = document.getElementById('inventory-modal');
                 if (modal) modal.classList.remove('visible');
@@ -524,6 +548,7 @@ export const ui = {
 
         document.addEventListener('change', (event) => {
             if (event.target.id === 'dark-mode-checkbox') mapa.alternarModoEscuro(event.target.checked);
+            if (event.target.id === 'sla-periodo') ui.renderizarSLA();
             if (event.target.id === 'snap-to-road-checkbox') {
                 state.isSnapToRoadEnabled = event.target.checked;
                 ui.mostrarToast(`Ímã de Ruas ${event.target.checked ? "Ativado" : "Desativado"}.`, "info");
@@ -889,6 +914,10 @@ export const ui = {
 
             ui.atualizarBadgeManutencao(rota);
 
+            if (typeof telemetria.renderizarMiniTrend === 'function') {
+                telemetria.renderizarMiniTrend(rota);
+            }
+
             // INTELIGÊNCIA GEOGRÁFICA
             const elDist = document.getElementById('route-distance-value');
             const elOrigem = document.getElementById('ui-route-origin');
@@ -1153,6 +1182,106 @@ export const ui = {
             });
         }
         modal.classList.add('visible');
+    },
+
+    abrirModalSLA: async () => {
+        const modal = document.getElementById('sla-modal');
+        const list = document.getElementById('sla-list');
+        if (!modal || !list) return;
+        modal.classList.add('visible');
+        list.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;"><i class="ph ph-spinner-gap ph-spin" style="font-size:28px;display:inline-block;animation:spin 1s linear infinite;"></i><p style="margin-top:12px;font-size:13px;">Calculando SLA...</p></div>';
+        await ui.renderizarSLA();
+    },
+
+    renderizarSLA: async () => {
+        const list = document.getElementById('sla-list');
+        const periodo = document.getElementById('sla-periodo')?.value || '30';
+        if (!list) return;
+        try {
+            const res = await fetch(`${state.API_URL_BASE}/sla?periodo=${periodo}`);
+            const dados = await res.json();
+            if (!dados || dados.length === 0) {
+                list.innerHTML = '<div style="text-align:center;padding:40px;color:#64748b;"><i class="ph ph-chart-bar" style="font-size:32px;display:block;margin-bottom:10px;opacity:0.5;"></i><p style="font-size:13px;">Nenhum dado de SLA disponível.</p></div>';
+                return;
+            }
+            let html = '<table class="inventory-table"><thead><tr><th style="width:40px;text-align:center;">Cor</th><th>Rota</th><th style="text-align:center;">SLA</th><th style="text-align:center;">Downtime</th><th style="text-align:center;">Incidentes</th><th style="text-align:center;">Barra</th></tr></thead><tbody>';
+            dados.forEach(r => {
+                const slaClass = r.sla >= 99.9 ? 'sla-excelente' : r.sla >= 99 ? 'sla-bom' : r.sla >= 95 ? 'sla-regular' : 'sla-critico';
+                const slaColor = r.sla >= 99.9 ? '#10b981' : r.sla >= 99 ? '#60a5fa' : r.sla >= 95 ? '#f59e0b' : '#ef4444';
+                const barWidth = Math.min(100, r.sla);
+                html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="text-align:center;padding:10px;"><div style="width:12px;height:12px;border-radius:3px;background:${r.cor || '#3b82f6'};margin:0 auto;"></div></td>
+                    <td style="font-weight:600;color:#e2e8f0;font-size:13px;">${r.nome}</td>
+                    <td style="text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;color:${slaColor};font-size:15px;">${r.sla}%</td>
+                    <td style="text-align:center;font-family:monospace;color:#94a3b8;font-size:13px;">${r.downtimeMin} min</td>
+                    <td style="text-align:center;color:#94a3b8;font-size:13px;">${r.incidentes}</td>
+                    <td style="padding:10px 15px;"><div style="background:rgba(255,255,255,0.06);border-radius:4px;height:8px;overflow:hidden;"><div style="height:100%;width:${barWidth}%;background:${slaColor};border-radius:4px;transition:width 0.5s;"></div></div></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            html += `<div style="margin-top:12px;text-align:right;color:#475569;font-size:11px;display:flex;justify-content:flex-end;gap:16px;">
+                <span><span style="color:#10b981;font-weight:700;">●</span> ≥99.9%</span>
+                <span><span style="color:#60a5fa;font-weight:700;">●</span> ≥99%</span>
+                <span><span style="color:#f59e0b;font-weight:700;">●</span> ≥95%</span>
+                <span><span style="color:#ef4444;font-weight:700;">●</span> &lt;95%</span>
+            </div>`;
+            list.innerHTML = html;
+        } catch (e) {
+            console.error('Erro ao carregar SLA:', e);
+            list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;">Erro ao carregar dados de SLA.</div>';
+        }
+    },
+
+    renderizarTimeline: async () => {
+        const list = document.getElementById('timeline-list');
+        if (!list) return;
+        if (!state.rotaSelecionada) {
+            list.innerHTML = '<div style="text-align:center;padding:30px;color:#64748b;font-size:13px;">Nenhuma rota selecionada.</div>';
+            return;
+        }
+        const periodBtn = document.querySelector('[data-tl-period].active');
+        const dias = periodBtn?.getAttribute('data-tl-period') || '7';
+        list.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;"><i class="ph ph-spinner-gap ph-spin" style="font-size:22px;display:inline-block;animation:spin 1s linear infinite;"></i></div>';
+        try {
+            const res = await fetch(`${state.API_URL_BASE}/rotas/${state.rotaSelecionada.id}/timeline?dias=${dias}`);
+            const dados = await res.json();
+            if (!dados || dados.length === 0) {
+                list.innerHTML = '<div style="text-align:center;padding:30px;color:#64748b;font-size:13px;">Nenhum incidente neste período.</div>';
+                return;
+            }
+            let html = '<div style="position:relative;padding-left:24px;">';
+            let lastDate = '';
+            dados.forEach((inc, i) => {
+                const data = new Date(inc.data_inicio);
+                const dataStr = data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                const horaStr = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const isAtivo = inc.status === 'Ativo';
+                const cor = inc.severidade === 'Crítico' ? '#ef4444' : inc.severidade === 'Erro' ? '#f59e0b' : '#3b82f6';
+                const duracao = inc.data_fim ? Math.round((new Date(inc.data_fim) - data) / 60000) + ' min' : 'Em andamento';
+
+                if (dataStr !== lastDate) {
+                    html += `<div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;">${dataStr}</div>`;
+                    lastDate = dataStr;
+                }
+                html += `<div style="position:relative;padding:0 0 12px 16px;border-left:2px solid ${isAtivo ? '#ef4444' : 'rgba(255,255,255,0.1)'};margin-left:0;">
+                    <div style="position:absolute;left:-6px;top:4px;width:10px;height:10px;border-radius:50%;background:${cor};border:2px solid #1e293b;"></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-size:12px;font-weight:600;color:#e2e8f0;">${horaStr}</span>
+                        <span style="font-size:10px;color:#64748b;font-family:monospace;">${duracao}</span>
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${inc.descricao || '—'}</div>
+                    <div style="display:flex;gap:6px;margin-top:4px;">
+                        <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:${cor}20;color:${cor};">${inc.severidade}</span>
+                        <span style="font-size:9px;font-weight:600;padding:1px 6px;border-radius:3px;background:${isAtivo ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'};color:${isAtivo ? '#ef4444' : '#10b981'};">${isAtivo ? 'ATIVO' : 'RESOLVIDO'}</span>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            list.innerHTML = html;
+        } catch (e) {
+            console.error('Erro ao carregar timeline:', e);
+            list.innerHTML = '<div style="text-align:center;padding:30px;color:#ef4444;font-size:13px;">Erro ao carregar histórico.</div>';
+        }
     },
 
     limparCamposFormulario: () => {

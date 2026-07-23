@@ -41,6 +41,35 @@ if (valido) {
       mapa.atualizarCoresDeSaude();
     }
     console.log(`✅ ${rotas.length} rotas carregadas.`);
+
+    // Kiosk Mode
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('kiosk') === 'true') {
+      document.body.classList.add('kiosk-mode');
+      const kioskInfo = document.getElementById('kiosk-info');
+      const kioskClock = document.getElementById('kiosk-clock');
+
+      let kioskIdx = 0;
+      setInterval(() => {
+        const problemasContainer = document.getElementById('alarm-list');
+        if (problemasContainer) {
+          const ativos = problemasContainer.querySelectorAll('.incident-card.active');
+          if (ativos.length > 0) {
+            const ativosArr = Array.from(ativos);
+            if (kioskIdx >= ativosArr.length) kioskIdx = 0;
+            const nome = ativosArr[kioskIdx]?.querySelector('.incident-card-name')?.textContent?.trim();
+            const rota = state.rotasSalvas.find(r => nome && r.nome_rota === nome);
+            if (rota && rota.coordenadas && typeof mapa.focarRota === 'function') {
+              mapa.focarRota(rota);
+            }
+            kioskIdx++;
+          }
+        }
+        if (kioskClock) {
+          kioskClock.textContent = new Date().toLocaleTimeString('pt-BR');
+        }
+      }, 15000);
+    }
   } catch (error) {
     console.error("❌ Erro ao carregar rotas:", error);
   }

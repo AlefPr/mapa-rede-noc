@@ -36,6 +36,7 @@ module.exports = (app) => {
   app.get('/api/zabbix/hostgroups', zabbixController.getHostGroups);
   app.get('/api/zabbix/hosts', zabbixController.getHosts);
   app.get('/api/zabbix/hosts/:hostId/items', zabbixController.getHostItems);
+  app.get('/api/zabbix/items/history', zabbixController.getItemHistoryDetailed);
   app.get('/api/zabbix/items/:itemId', zabbixController.getItemLinks);
   app.get('/api/zabbix/item/history', zabbixController.getItemHistory);
   app.get('/api/zabbix/item/:itemId/history', zabbixController.getItemHistoryDetailed);

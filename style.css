@@ -1168,3 +1168,163 @@ html, body {
     0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
     50% { box-shadow: 0 0 6px 2px rgba(245, 158, 11, 0.3); }
 }
+
+/* ── Weather Overlay ── */
+#weather-overlay {
+    position: fixed;
+    bottom: 100px;
+    right: 20px;
+    z-index: 999;
+    background: rgba(15,23,42,0.92);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px;
+    min-width: 240px;
+    max-width: 340px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    pointer-events: auto;
+    transition: opacity 0.3s;
+}
+.weather-loading {
+    color: #94a3b8;
+    font-size: 13px;
+    text-align: center;
+    padding: 20px 0;
+}
+.weather-header {
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.weather-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.weather-card {
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.weather-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+.weather-temp {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f8fafc;
+    font-family: 'JetBrains Mono', monospace;
+}
+.weather-desc {
+    font-size: 12px;
+    color: #cbd5e1;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.weather-detail {
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.6;
+}
+.weather-rain {
+    color: #38bdf8;
+}
+#btn-clima.active {
+    background: #0284c7 !important;
+    color: white !important;
+    box-shadow: 0 0 12px rgba(2,132,199,0.4);
+}
+
+/* ── Kiosk Mode ── */
+#kiosk-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 9999;
+    pointer-events: none;
+}
+.kiosk-mode #kiosk-overlay {
+    display: block;
+}
+.kiosk-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: linear-gradient(180deg, rgba(15,23,42,0.95) 60%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    z-index: 10000;
+    pointer-events: none;
+}
+.kiosk-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 2px;
+}
+.kiosk-clock {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: #f8fafc;
+    letter-spacing: 1px;
+}
+.kiosk-footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 48px;
+    background: linear-gradient(0deg, rgba(15,23,42,0.95) 60%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    pointer-events: none;
+}
+.kiosk-route-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e2e8f0;
+    letter-spacing: 0.5px;
+}
+.kiosk-mode #noc-toolbox,
+.kiosk-mode #route-drawer,
+.kiosk-mode #route-hover-card,
+.kiosk-mode #widget-alarms,
+.kiosk-mode #alarm-panel,
+.kiosk-mode #command-palette-overlay,
+.kiosk-mode #route-context-menu,
+.kiosk-mode .gm-bundled-control,
+.kiosk-mode .gm-fullscreen-control {
+    display: none !important;
+}
+.kiosk-mode #alarm-panel {
+    display: flex !important;
+    position: fixed;
+    right: 20px;
+    top: 70px;
+    width: 340px;
+    max-height: calc(100vh - 140px);
+    background: rgba(15,23,42,0.88);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    z-index: 9998;
+    pointer-events: auto;
+}
+.kiosk-mode #alarm-panel .alarm-panel-header {
+    padding: 14px 16px;
+}
+.kiosk-mode #alarm-panel .panel-title {
+    font-size: 14px;
+}
