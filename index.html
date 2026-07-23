@@ -592,25 +592,67 @@
 </div>
 
 <div id="login-overlay">
-  <div class="login-panel">
-    <div class="login-brand">◆ noculys.io  ·  v2.0.1</div>
-    <div class="login-header">
-      <h3>> autenticação</h3>
-      <p>digite as credenciais de acesso</p>
-    </div>
-    <div id="login-error"></div>
-    <div class="login-field">
-      <span class="login-prefix">> user</span>
-      <input id="login-username" type="text" placeholder="username" autocomplete="off" spellcheck="false">
-    </div>
-    <div class="login-field">
-      <span class="login-prefix">> pass</span>
-      <div class="login-pass-wrap">
-        <input id="login-password" type="password" placeholder="password" autocomplete="off">
-        <span id="toggle-pass">ver</span>
+  <div class="lgn-container">
+    <!-- LEFT: SYSTEM INFO -->
+    <section class="lgn-panel-info">
+      <div class="lgn-info-content">
+        <div class="lgn-logo-line">noculys.io  ·  v2.0.1</div>
+        <div class="lgn-clock" id="lgn-clock">--:--:--</div>
+        <div class="lgn-date" id="lgn-date">---</div>
+        <div class="lgn-status-grid">
+          <div class="lgn-status-item">
+            <span class="lgn-status-label">API</span>
+            <span class="lgn-status-value"><span class="lgn-dot offline" id="lgn-s-api"></span><span id="lgn-sl-api">Checking</span></span>
+          </div>
+          <div class="lgn-status-item">
+            <span class="lgn-status-label">Base de Dados</span>
+            <span class="lgn-status-value"><span class="lgn-dot offline" id="lgn-s-db"></span><span id="lgn-sl-db">---</span></span>
+          </div>
+          <div class="lgn-status-item">
+            <span class="lgn-status-label">Redis</span>
+            <span class="lgn-status-value"><span class="lgn-dot offline" id="lgn-s-redis"></span><span id="lgn-sl-redis">---</span></span>
+          </div>
+        </div>
+        <div class="lgn-terminal-line">
+          <span><span class="lgn-prompt">noculys</span>@<span class="lgn-cmd">last login</span></span>
+          <span id="lgn-last-login">---</span>
+        </div>
+        <div class="lgn-log-container">
+          <div class="lgn-log-scroll" id="lgn-log-scroll"></div>
+        </div>
       </div>
-    </div>
-    <button id="btn-login-submit"><i class="ph ph-sign-in"></i> Autenticar</button>
+    </section>
+    <!-- RIGHT: AUTH -->
+    <section class="lgn-panel-auth">
+      <div class="lgn-auth-wrapper">
+        <div class="lgn-auth-header">
+          <div class="lgn-auth-title">> noculys.io login</div>
+          <div class="lgn-auth-subtitle">digite as credenciais de acesso</div>
+        </div>
+        <div id="login-error"></div>
+        <div class="lgn-form-group">
+          <div class="lgn-input-row">
+            <span class="lgn-input-prefix"><span class="lgn-arrow">&gt;</span> user</span>
+            <input type="text" id="login-username" placeholder="utilizador" autocomplete="username" spellcheck="false">
+          </div>
+        </div>
+        <div class="lgn-form-group">
+          <div class="lgn-input-row">
+            <span class="lgn-input-prefix"><span class="lgn-arrow">&gt;</span> pass</span>
+            <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+            <button type="button" class="lgn-toggle-pass" id="toggle-pass">ver</button>
+          </div>
+        </div>
+        <button type="submit" class="lgn-btn-auth" id="btn-login-submit">
+          <span class="lgn-btn-label">Autenticar</span>
+          <span class="lgn-spinner"></span>
+        </button>
+        <div class="lgn-auth-footer">
+          <span>noculys.io</span>
+          <span>v2.0.1 · 2026</span>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 

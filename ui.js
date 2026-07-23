@@ -1870,7 +1870,7 @@ export const ui = {
             }
             try {
                 btnSubmit.disabled = true;
-                btnSubmit.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Entrando...';
+                btnSubmit.classList.add('loading');
                 await auth.login(username, password);
                 ui.esconderLogin();
                 ui.atualizarEstadoAuth();
@@ -1881,7 +1881,7 @@ export const ui = {
                 ui.mostrarErroLogin(e.message);
             } finally {
                 btnSubmit.disabled = false;
-                btnSubmit.innerHTML = '<i class="ph ph-sign-in"></i> Entrar';
+                btnSubmit.classList.remove('loading');
             }
         });
 
@@ -1916,11 +1916,15 @@ export const ui = {
         document.getElementById('login-password').value = '';
         const err = document.getElementById('login-error');
         if (err) err.style.display = 'none';
+        ui.iniciarAnimacoesOverlay();
     },
 
     esconderLogin: () => {
         const overlay = document.getElementById('login-overlay');
         if (overlay) overlay.style.display = 'none';
+        if (ui._overlayClockTimer) { clearInterval(ui._overlayClockTimer); ui._overlayClockTimer = null; }
+        if (ui._overlayHealthTimer) { clearInterval(ui._overlayHealthTimer); ui._overlayHealthTimer = null; }
+        if (ui._overlayLogIv) { clearInterval(ui._overlayLogIv); ui._overlayLogIv = null; }
     },
 
     mostrarErroLogin: (msg) => {
@@ -1929,6 +1933,104 @@ export const ui = {
             el.textContent = msg;
             el.style.display = 'block';
         }
+    },
+
+    _overlayLogs: [
+        { tag: 'ok', service: 'system', msg: 'NOC daemon started' },
+        { tag: 'ok', service: 'mysql', msg: 'connection pool ready' },
+        { tag: 'ok', service: 'redis', msg: 'connected to 127.0.0.1:6379' },
+        { tag: 'ok', service: 'zabbix', msg: 'cache sync completed · 43 items' },
+        { tag: 'ok', service: 'socket.io', msg: 'listening on port 3000' },
+        { tag: 'ok', service: 'system', msg: 'monitoring daemon started' },
+    ],
+    _overlayLogIdx: 0,
+    _overlayLogTimer: null,
+    _overlayClockTimer: null,
+    _overlayHealthTimer: null,
+    _overlayLogIv: null,
+
+    iniciarAnimacoesOverlay: () => {
+        const overlay = document.getElementById('login-overlay');
+        if (!overlay || overlay.style.display !== 'flex') return;
+
+        // ── Last Login ──
+        const lastLogin = document.getElementById('lgn-last-login');
+        if (lastLogin) {
+            lastLogin.textContent = localStorage.getItem('noc_last_login') || 'Nunca  ·  primeiro acesso';
+        }
+
+        // ── Clock ──
+        if (ui._overlayClockTimer) clearInterval(ui._overlayClockTimer);
+        function updateClock() {
+            const now = new Date();
+            const c = document.getElementById('lgn-clock');
+            const d = document.getElementById('lgn-date');
+            if (c) c.textContent = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+            if (d) d.textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        }
+        updateClock();
+        ui._overlayClockTimer = setInterval(updateClock, 1000);
+
+        // ── Log ──
+        ui._overlayLogIdx = 0;
+        const scroll = document.getElementById('lgn-log-scroll');
+        if (scroll) scroll.innerHTML = '';
+        if (ui._overlayLogIv) clearInterval(ui._overlayLogIv);
+        function addLog() {
+            if (ui._overlayLogIdx >= ui._overlayLogs.length) return;
+            const e = ui._overlayLogs[ui._overlayLogIdx++];
+            const div = document.createElement('div');
+            div.className = 'lgn-log-line';
+            div.innerHTML = '<span class="lgn-ts">[' + e.tag + ']</span> <span class="lgn-info">' + e.service + '</span> ' + e.msg;
+            scroll?.appendChild(div);
+        }
+        for (let i = 0; i < 4; i++) addLog();
+        ui._overlayLogIv = setInterval(() => { addLog(); if (ui._overlayLogIdx >= ui._overlayLogs.length) clearInterval(ui._overlayLogIv); }, 500);
+
+        // ── Health Check ──
+        if (ui._overlayHealthTimer) clearInterval(ui._overlayHealthTimer);
+        function setStatus(dotId, labelId, ok) {
+            const dot = document.getElementById(dotId);
+            const label = document.getElementById(labelId);
+            if (!dot || !label) return;
+            dot.className = 'lgn-dot ' + (ok ? 'online' : 'offline');
+            label.textContent = ok ? 'Online' : 'Offline';
+        }
+        async function checkHealth() {
+            try {
+                const res = await fetch('/mapa/health');
+                if (res.ok) {
+                    const data = await res.json();
+                    setStatus('lgn-s-api', 'lgn-sl-api', true);
+                    setStatus('lgn-s-db', 'lgn-sl-db', data.mariadb === true);
+                    setStatus('lgn-s-redis', 'lgn-sl-redis', data.redis === true);
+                } else {
+                    setStatus('lgn-s-api', 'lgn-sl-api', false);
+                    setStatus('lgn-s-db', 'lgn-sl-db', false);
+                    setStatus('lgn-s-redis', 'lgn-sl-redis', false);
+                }
+            } catch {
+                setStatus('lgn-s-api', 'lgn-sl-api', false);
+                setStatus('lgn-s-db', 'lgn-sl-db', false);
+                setStatus('lgn-s-redis', 'lgn-sl-redis', false);
+            }
+        }
+        checkHealth();
+        ui._overlayHealthTimer = setInterval(checkHealth, 10000);
+
+        // ── Stop timers when overlay closes ──
+        function stopTimers() {
+            if (ui._overlayClockTimer) { clearInterval(ui._overlayClockTimer); ui._overlayClockTimer = null; }
+            if (ui._overlayHealthTimer) { clearInterval(ui._overlayHealthTimer); ui._overlayHealthTimer = null; }
+            if (ui._overlayLogIv) { clearInterval(ui._overlayLogIv); ui._overlayLogIv = null; }
+            overlay.removeEventListener('transitionend', stopTimers);
+        }
+        overlay.addEventListener('transitionend', stopTimers);
+        // Also stop if display changes directly
+        const mo = new MutationObserver(() => {
+            if (overlay.style.display !== 'flex') { stopTimers(); mo.disconnect(); }
+        });
+        mo.observe(overlay, { attributes: true, attributeFilter: ['style'] });
     },
 
     atualizarEstadoAuth: () => {
