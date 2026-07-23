@@ -29,7 +29,7 @@ async function initApp() {
   try {
     const valido = await auth.verify();
     if (!valido) {
-      window.location.href = 'login.html';
+      ui.mostrarLogin();
       return;
     }
     ui.atualizarEstadoAuth();

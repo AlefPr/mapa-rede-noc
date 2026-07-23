@@ -1853,12 +1853,12 @@ export const ui = {
         const btnSubmit = document.getElementById('btn-login-submit');
         const loginError = document.getElementById('login-error');
 
-        btnLogin?.addEventListener('click', () => { window.location.href = 'login.html'; });
+        btnLogin?.addEventListener('click', () => { ui.mostrarLogin(); });
 
         btnLogout?.addEventListener('click', async () => {
             await auth.logout();
             ui.atualizarEstadoAuth();
-            window.location.href = 'login.html';
+            ui.mostrarLogin();
         });
 
         btnSubmit?.addEventListener('click', async () => {
@@ -1897,7 +1897,7 @@ export const ui = {
 
         document.addEventListener('auth:expired', () => {
             ui.atualizarEstadoAuth();
-            window.location.href = 'login.html';
+            ui.mostrarLogin();
         });
     },
 

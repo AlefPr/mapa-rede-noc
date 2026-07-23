@@ -9,7 +9,8 @@ const cors = require('cors');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-const http = require('http');
+const https = require('https');
+const fs = require('fs');
 const { Server } = require("socket.io");
 const zabbixService = require('./services/zabbixService');
 const redisClient = require('./redisClient');
@@ -18,9 +19,16 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 const FRONTEND_DIR = '/var/www/html/mapa';
 
+const sslKeyPath = process.env.SSL_KEY_PATH || '/etc/ssl/noc/server.key';
+const sslCertPath = process.env.SSL_CERT_PATH || '/etc/ssl/noc/server.crt';
+const sslOptions = {
+  key: fs.readFileSync(sslKeyPath),
+  cert: fs.readFileSync(sslCertPath)
+};
+
 const app = express();
-const server = http.createServer(app);
-const frontendUrl = process.env.FRONTEND_URL || 'http://localhost';
+const server = https.createServer(sslOptions, app);
+const frontendUrl = process.env.FRONTEND_URL || 'https://localhost';
 
 const allowedOrigins = [frontendUrl, frontendUrl.replace('http://', 'https://')];
 if (process.env.FRONTEND_URLS) {
@@ -73,7 +81,6 @@ app.use(helmet({
       connectSrc: ["'self'", "ws:", "wss:", "http:", "https:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
       frameSrc: ["https://maps.googleapis.com"],
-      "upgrade-insecure-requests": null,
     }
   }
 }));
