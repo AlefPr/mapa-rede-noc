@@ -388,8 +388,26 @@ export const ui = {
                 }
             }
 
-            if (!target.closest('#tb-more-wrap')) {
-                document.getElementById('tb-more-popup')?.classList.remove('visible');
+            if (target.matches('#tb-toggle') || target.closest('#tb-toggle')) {
+                const panel = document.getElementById('tb-panel');
+                const btn = document.getElementById('tb-toggle');
+                if (panel && btn) {
+                    const opening = !panel.classList.contains('visible');
+                    panel.classList.toggle('visible');
+                    btn.classList.toggle('open');
+                    if (opening) {
+                        setTimeout(() => {
+                            const close = (e) => {
+                                if (!e.target.closest('#tb-panel') && !e.target.closest('#tb-toggle')) {
+                                    panel.classList.remove('visible');
+                                    btn.classList.remove('open');
+                                    document.removeEventListener('click', close);
+                                }
+                            };
+                            document.addEventListener('click', close);
+                        }, 0);
+                    }
+                }
             }
             if (target.matches('#close-drawer-button') || target.closest('#close-drawer-button')) ui.fecharGaveta();
             if (target.matches('#modal-cancel-button') || target.closest('#modal-cancel-button')) ui.fecharGaveta();
@@ -498,12 +516,7 @@ export const ui = {
             if (target.matches('#btn-salvar-template') || target.closest('#btn-salvar-template')) {
                 ui.abrirModalSalvarTemplate();
             }
-            if (target.matches('#tb-more-btn') || target.closest('#tb-more-btn')) {
-                const popup = document.getElementById('tb-more-popup');
-                if (popup) popup.classList.toggle('visible');
-            }
             if (target.matches('#btn-aplicar-template') || target.closest('#btn-aplicar-template')) {
-                document.getElementById('tb-more-popup')?.classList.remove('visible');
                 ui.abrirModalAplicarTemplate();
             }
             if (target.matches('#btn-confirmar-template') || target.closest('#btn-confirmar-template')) {
