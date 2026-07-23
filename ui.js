@@ -1875,10 +1875,7 @@ export const ui = {
                 btnSubmit.classList.add('loading');
                 await auth.login(username, password);
                 ui.esconderLogin();
-                ui.atualizarEstadoAuth();
-                document.getElementById('login-username').value = '';
-                document.getElementById('login-password').value = '';
-                loginError.style.display = 'none';
+                window.location.reload();
             } catch (e) {
                 ui.mostrarErroLogin(e.message);
             } finally {
