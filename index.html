@@ -19,44 +19,49 @@
 
 <body>
 
-  <div id="noc-toolbox" style="position: absolute; bottom: 30px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; background: rgba(24, 24, 27, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 10px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-        <button id="btn-problemas" title="Central de Incidentes" class="tool-btn" style="position: relative; color: #ef4444;">
-            <i class="ph ph-warning-circle" style="font-size: 22px;"></i>
-            <span id="alarm-badge" style="position: absolute; top: -2px; right: -2px; background: #ef4444; color: white; border-radius: 12px; padding: 2px 5px; font-size: 10px; font-weight: bold; display: none; border: 2px solid #18181b;">0</span>
+  <div id="noc-toolbox">
+        <button id="btn-problemas" title="Central de Incidentes" class="tool-btn" style="position:relative;color:#ef4444;">
+            <i class="ph ph-warning-circle"></i>
+            <span id="alarm-badge" class="alarm-badge">0</span>
         </button>
-        <button id="btn-clima" title="Camada de Clima" class="tool-btn"><i class="ph ph-cloud-rain" style="font-size: 22px;"></i></button>
-        <div style="height: 1px; width: 100%; background: rgba(255,255,255,0.06); margin: 2px 0; border-radius: 1px;"></div>
-        <button id="create-route-button" title="Criar Nova Rota" class="tool-btn" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><i class="ph ph-plus-circle" style="font-size: 22px;"></i></button>
-        <button id="btn-aplicar-template" title="Aplicar Template" class="tool-btn" style="color:#a78bfa;"><i class="ph ph-bookmark-simple" style="font-size: 22px;"></i></button>
-        <button id="quick-delete-button" title="Modo Exclusão Rápida" class="tool-btn"><i class="ph ph-trash" style="font-size: 22px;"></i></button>
-        <button id="open-inventory-button" title="Inventário de Rede" class="tool-btn"><i class="ph ph-hard-drives" style="font-size: 22px;"></i></button>
-        <button id="btn-sla" title="SLA · Disponibilidade" class="tool-btn"><i class="ph ph-chart-bar" style="font-size: 22px;"></i></button>
-        <button id="btn-resumo" title="Painel de Rotas" class="tool-btn"><i class="ph ph-list-magnifying-glass" style="font-size: 22px;"></i></button>
-        
-        <label title="Ímã de Ruas" class="tool-btn"><input type="checkbox" id="snap-to-road-checkbox" style="display: none;"><i class="ph ph-magnet" style="font-size: 22px;"></i></label>
-        
-        <label title="Alternar Tema" class="tool-btn"><input type="checkbox" id="dark-mode-checkbox" checked style="display: none;"><i class="ph ph-moon" style="font-size: 22px;"></i></label>
-        <div style="height: 1px; width: 100%; background: rgba(255,255,255,0.06); margin: 2px 0; border-radius: 1px;"></div>
-        <button id="btn-login" title="Autenticação" class="tool-btn" style="color: #60a5fa;"><i class="ph ph-user-circle" style="font-size: 22px;"></i></button>
-        <button id="btn-logout" title="Sair" class="tool-btn" style="color: #ef4444; display: none;"><i class="ph ph-sign-out" style="font-size: 22px;"></i></button>
+        <button id="btn-clima" title="Camada de Clima" class="tool-btn"><i class="ph ph-cloud-rain"></i></button>
+        <button id="btn-sla" title="SLA · Disponibilidade" class="tool-btn"><i class="ph ph-chart-bar"></i></button>
+        <button id="btn-resumo" title="Painel de Rotas" class="tool-btn"><i class="ph ph-list-magnifying-glass"></i></button>
+        <div class="tb-sep"></div>
+        <button id="create-route-button" title="Criar Nova Rota" class="tool-btn tb-create"><i class="ph ph-plus-circle"></i></button>
+        <div class="tb-sep"></div>
+        <label title="Ímã de Ruas" class="tool-btn"><input type="checkbox" id="snap-to-road-checkbox" style="display:none;"><i class="ph ph-magnet"></i></label>
+        <label title="Alternar Tema" class="tool-btn"><input type="checkbox" id="dark-mode-checkbox" checked style="display:none;"><i class="ph ph-moon"></i></label>
+        <div class="tb-sep"></div>
+        <button id="btn-login" title="Autenticação" class="tool-btn" style="color:#60a5fa;"><i class="ph ph-user-circle"></i></button>
+        <button id="btn-logout" title="Sair" class="tool-btn" style="color:#ef4444;display:none;"><i class="ph ph-sign-out"></i></button>
+        <div class="tb-sep"></div>
+        <div class="tb-more-wrap">
+            <button id="tb-more-btn" title="Mais Ferramentas" class="tool-btn"><i class="ph ph-dots-three-outline-vertical"></i></button>
+            <div id="tb-more-popup">
+                <button id="btn-aplicar-template" title="Aplicar Template" class="tool-btn"><i class="ph ph-bookmark-simple"></i><span>Template</span></button>
+                <button id="quick-delete-button" title="Modo Exclusão Rápida" class="tool-btn"><i class="ph ph-trash"></i><span>Excluir</span></button>
+                <button id="open-inventory-button" title="Inventário de Rede" class="tool-btn"><i class="ph ph-hard-drives"></i><span>Inventário</span></button>
+            </div>
+        </div>
     </div>
  
-    <div id="resumo-panel" style="display:none;position:fixed;top:0;left:0;bottom:0;width:340px;z-index:999;background:rgba(15,23,42,0.95);backdrop-filter:blur(16px);border-right:1px solid rgba(255,255,255,0.08);display:none;flex-direction:column;">
-        <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <h3 style="margin:0;font-size:16px;color:#f8fafc;display:flex;align-items:center;gap:8px;"><i class="ph ph-list-magnifying-glass" style="color:#3b82f6;"></i> Painel de Rotas</h3>
-                <button id="fechar-resumo" class="btn-secondary" style="padding:4px 8px;font-size:16px;margin:0;line-height:1;"><i class="ph ph-x"></i></button>
+    <div id="resumo-panel">
+        <div class="rp-header">
+            <div class="rp-header-top">
+                <h3 class="rp-title"><i class="ph ph-list-magnifying-glass"></i> Rotas</h3>
+                <button id="fechar-resumo" class="btn-secondary" style="padding:2px 6px;font-size:13px;margin:0;line-height:1;"><i class="ph ph-x"></i></button>
             </div>
-            <input id="resumo-busca" type="text" placeholder="Buscar rota..." style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;outline:none;box-sizing:border-box;">
-            <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;" id="resumo-filtros">
+            <input id="resumo-busca" type="text" placeholder="Buscar..." class="rp-input">
+            <div class="rp-filtros" id="resumo-filtros">
                 <button class="resumo-filtro ativo" data-filtro="">Todas</button>
                 <button class="resumo-filtro" data-filtro="up">UP</button>
                 <button class="resumo-filtro" data-filtro="down">DOWN</button>
-                <button class="resumo-filtro" data-filtro="saturado">Saturado</button>
-                <button class="resumo-filtro" data-filtro="manutencao">Manutenção</button>
+                <button class="resumo-filtro" data-filtro="saturado">Sat.</button>
+                <button class="resumo-filtro" data-filtro="manutencao">Manut</button>
             </div>
         </div>
-        <div id="resumo-lista" style="flex:1;overflow-y:auto;padding:8px;"></div>
+        <div id="resumo-lista"></div>
     </div>
     <div id="alarm-panel">
         <div class="alarm-header">

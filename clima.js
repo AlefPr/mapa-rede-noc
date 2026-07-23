@@ -17,25 +17,25 @@ const REGIOES = {
 
 export const clima = {
   active: false,
+  expanded: false,
   mapListener: null,
+  lastData: null,
 
   async toggle() {
     this.active = !this.active;
     document.getElementById('btn-clima')?.classList.toggle('active', this.active);
     document.getElementById('weather-overlay')?.remove();
+    this.expanded = false;
     if (this.mapListener) {
       google.maps.event.removeListener(this.mapListener);
       this.mapListener = null;
     }
-
     if (!this.active) return;
 
     const overlay = document.createElement('div');
     overlay.id = 'weather-overlay';
-    overlay.innerHTML = '<div class="weather-loading"><i class="ph ph-spinner-gap ph-spin"></i> Carregando clima...</div>';
     document.body.appendChild(overlay);
-
-    await this.atualizar();
+    this.atualizar();
 
     if (state.map) {
       this.mapListener = state.map.addListener('idle', () => this.atualizar());
@@ -49,42 +49,72 @@ export const clima = {
     const center = state.map?.getCenter();
     if (!center) return;
 
-    const lat = center.lat();
-    const lng = center.lng();
-
-    overlay.innerHTML = '<div class="weather-loading"><i class="ph ph-spinner-gap ph-spin"></i> Carregando clima...</div>';
+    if (!this.lastData) {
+      overlay.innerHTML = '<div class="w-badge"><span class="w-loading"><i class="ph ph-spinner-gap ph-spin"></i></span></div>';
+    }
 
     try {
-      const res = await fetch(`${state.API_URL_BASE}/weather?lat=${lat}&lng=${lng}`);
+      const res = await fetch(`${state.API_URL_BASE}/weather?lat=${center.lat()}&lng=${center.lng()}`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const w = await res.json();
-
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const regiao = REGIOES[tz] || `Coordenada ${lat.toFixed(2)}, ${lng.toFixed(2)}`;
-
-      overlay.innerHTML = `
-        <div class="weather-header"><i class="ph ph-cloud"></i> Condições na Região</div>
-        <div class="weather-grid"><div class="weather-card">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <div class="weather-icon">${this.icone(w.weather_code)}</div>
-            <div>
-              <div class="weather-temp">${w.temperature.toFixed(1)}°C</div>
-              <div class="weather-desc">${w.condition}</div>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;">
-            <div class="weather-detail">🌡️ Sensação ${w.feels_like.toFixed(1)}°C</div>
-            <div class="weather-detail">💧 Umidade ${w.humidity}%</div>
-            <div class="weather-detail">💨 Vento ${w.wind_speed.toFixed(0)} km/h</div>
-            <div class="weather-detail ${w.precipitation > 0 ? 'weather-rain' : ''}">🌧️ Precip. ${w.precipitation.toFixed(1)} mm</div>
-          </div>
-          <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);font-size:10px;color:#475569;">
-            Dados: Open-Meteo · Posição central do mapa (${lat.toFixed(2)}, ${lng.toFixed(2)})
-          </div>
-        </div></div>`;
+      this.lastData = await res.json();
     } catch (e) {
       console.error('Weather error:', e);
-      overlay.innerHTML = '<div style="padding:20px;text-align:center;color:#ef4444;font-size:12px;">Erro ao carregar clima</div>';
+      overlay.innerHTML = '<div class="w-badge"><span class="w-loading" style="color:#ef4444;">!</span></div>';
+      return;
+    }
+
+    this.render(overlay);
+  },
+
+  render(overlay) {
+    const w = this.lastData;
+    if (!w) return;
+
+    const icone = this.icone(w.weather_code);
+
+    if (this.expanded) {
+      overlay.innerHTML = `
+        <div class="w-badge w-expanded" id="weather-body">
+          <div class="w-main" id="w-toggle">
+            <span class="w-ico">${icone}</span>
+            <span class="w-temp">${w.temperature.toFixed(1)}°</span>
+          </div>
+          <div class="w-details">
+            <div class="w-det-row"><span>Condição</span><span>${w.condition}</span></div>
+            <div class="w-det-row"><span>Sensação</span><span>${w.feels_like.toFixed(1)}°C</span></div>
+            <div class="w-det-row"><span>Umidade</span><span>${w.humidity}%</span></div>
+            <div class="w-det-row"><span>Vento</span><span>${w.wind_speed.toFixed(0)} km/h</span></div>
+            <div class="w-det-row"><span>Precip.</span><span>${w.precipitation.toFixed(1)} mm</span></div>
+            <div class="w-det-footer">Open-Meteo · ${centerLabel()}</div>
+          </div>
+        </div>
+      `;
+    } else {
+      overlay.innerHTML = `
+        <div class="w-badge" id="weather-body">
+          <div class="w-main" id="w-toggle">
+            <span class="w-ico">${icone}</span>
+            <span class="w-temp">${w.temperature.toFixed(1)}°</span>
+          </div>
+        </div>
+      `;
+    }
+
+    document.getElementById('w-toggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.expanded = !this.expanded;
+      this.render(overlay);
+    });
+
+    if (this.expanded) {
+      const closeOutside = (e) => {
+        if (!e.target.closest('#weather-overlay')) {
+          this.expanded = false;
+          this.render(overlay);
+          document.removeEventListener('click', closeOutside);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeOutside), 0);
     }
   },
 
@@ -105,5 +135,13 @@ export const clima = {
       this.mapListener = null;
     }
     document.getElementById('weather-overlay')?.remove();
+    this.lastData = null;
+    this.expanded = false;
   }
 };
+
+function centerLabel() {
+  const c = state.map?.getCenter();
+  if (!c) return '';
+  return `${c.lat().toFixed(2)}, ${c.lng().toFixed(2)}`;
+}

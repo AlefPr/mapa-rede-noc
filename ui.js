@@ -388,6 +388,9 @@ export const ui = {
                 }
             }
 
+            if (!target.closest('#tb-more-wrap')) {
+                document.getElementById('tb-more-popup')?.classList.remove('visible');
+            }
             if (target.matches('#close-drawer-button') || target.closest('#close-drawer-button')) ui.fecharGaveta();
             if (target.matches('#modal-cancel-button') || target.closest('#modal-cancel-button')) ui.fecharGaveta();
             if (target.matches('#modal-save-button') || target.closest('#modal-save-button')) await ui.salvarRota();
@@ -486,7 +489,7 @@ export const ui = {
             }
             if (target.matches('#btn-resumo') || target.closest('#btn-resumo')) ui.alternarResumo();
             if (target.matches('#fechar-resumo') || target.closest('#fechar-resumo')) {
-                document.getElementById('resumo-panel').style.display = 'none';
+                document.getElementById('resumo-panel')?.classList.remove('visible');
             }
 
             // ==========================================
@@ -495,7 +498,12 @@ export const ui = {
             if (target.matches('#btn-salvar-template') || target.closest('#btn-salvar-template')) {
                 ui.abrirModalSalvarTemplate();
             }
+            if (target.matches('#tb-more-btn') || target.closest('#tb-more-btn')) {
+                const popup = document.getElementById('tb-more-popup');
+                if (popup) popup.classList.toggle('visible');
+            }
             if (target.matches('#btn-aplicar-template') || target.closest('#btn-aplicar-template')) {
+                document.getElementById('tb-more-popup')?.classList.remove('visible');
                 ui.abrirModalAplicarTemplate();
             }
             if (target.matches('#btn-confirmar-template') || target.closest('#btn-confirmar-template')) {
@@ -1355,15 +1363,10 @@ export const ui = {
     alternarResumo: () => {
         const panel = document.getElementById('resumo-panel');
         if (!panel) return;
-        const visivel = panel.style.display !== 'none';
-        panel.style.display = visivel ? 'none' : 'flex';
+        const visivel = panel.classList.contains('visible');
+        panel.classList.toggle('visible');
         if (!visivel) {
             ui.renderizarResumo();
-            if (state.map) {
-                google.maps.event.addListenerOnce(state.map, 'click', () => {
-                    panel.style.display = 'none';
-                });
-            }
         }
     },
 
@@ -1912,11 +1915,16 @@ export const ui = {
 
         const maintBtn = document.getElementById('btn-manutencao-rota');
 
+        const templateBtn = document.getElementById('btn-aplicar-template');
+        const inventoryBtn = document.getElementById('open-inventory-button');
+
         if (state.autenticado) {
             if (btnLogin) btnLogin.style.display = 'none';
             if (btnLogout) btnLogout.style.display = 'flex';
             if (createBtn) createBtn.style.display = 'flex';
             if (deleteBtn) deleteBtn.style.display = 'flex';
+            if (templateBtn) templateBtn.style.display = 'flex';
+            if (inventoryBtn) inventoryBtn.style.display = 'flex';
             if (limparBtn) limparBtn.style.display = 'inline-block';
             if (maintBtn) maintBtn.style.display = 'inline-flex';
         } else {
@@ -1924,6 +1932,8 @@ export const ui = {
             if (btnLogout) btnLogout.style.display = 'none';
             if (createBtn) createBtn.style.display = 'none';
             if (deleteBtn) deleteBtn.style.display = 'none';
+            if (templateBtn) templateBtn.style.display = 'none';
+            if (inventoryBtn) inventoryBtn.style.display = 'none';
             if (limparBtn) limparBtn.style.display = 'none';
             if (maintBtn) maintBtn.style.display = 'none';
         }
