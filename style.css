@@ -40,37 +40,6 @@
 .tb-btn:has(input:checked) { color: #3b82f6; background: rgba(59,130,246,0.15); }
 .tb-create { background: rgba(59,130,246,0.15); color: #60a5fa; }
 .alarm-badge { position:absolute; top:-3px; right:-3px; background:#ef4444; color:#fff; border-radius:10px; padding:1px 4px; font-size:8px; font-weight:700; display:none; border:1.5px solid #18181b; line-height:1.2; }
-ine-height:1.2; }
-
-.tb-more-wrap { position:relative; }
-#tb-more-btn { font-size:14px; }
-#tb-more-popup {
-    display: none;
-    position: absolute;
-    left: 38px; bottom: 0;
-    background: rgba(24,24,27,0.95);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    padding: 4px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-    z-index: 1001;
-    flex-direction: column;
-    gap: 2px;
-    white-space: nowrap;
-}
-#tb-more-popup.visible { display: flex; }
-#tb-more-popup .tool-btn {
-    width: auto; height: 30px;
-    padding: 0 14px 0 8px;
-    justify-content: flex-start;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    border-radius: 5px;
-}
-#tb-more-popup .tool-btn i { font-size: 15px; flex-shrink: 0; }
-#tb-more-popup .tool-btn span { color: #cbd5e1; }
 
 /* ==========================================================================
    3. ESTRUTURA DOS MODAIS CENTRAIS (INVENTÁRIO E TRÁFEGO WIDE)
