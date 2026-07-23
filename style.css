@@ -32,55 +32,75 @@ html, body {
     cursor: pointer; transition: 0.15s;
     box-shadow: 0 6px 18px rgba(0,0,0,0.4);
 }
+#tb-toggle i { transition: transform 0.2s ease; }
 #tb-toggle:hover { color: #fff; background: rgba(24,24,27,0.95); }
 #tb-toggle.open { background: rgba(59,130,246,0.2); color: #60a5fa; border-color: rgba(59,130,246,0.3); }
+#tb-toggle.open i { transform: rotate(90deg); }
 
 #tb-panel {
-    display: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     position: absolute; bottom: 78px; left: 20px; z-index: 1000;
     background: rgba(24,24,27,0.92); backdrop-filter: blur(16px);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 12px;
-    padding: 10px;
+    padding: 6px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
 }
-#tb-panel.visible { display: block; }
-#tb-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+#tb-panel.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
 }
+
+.tb-btn, .tb-sep {
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s ease, color 0.15s ease;
+}
+@keyframes tb-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+#tb-panel.visible .tb-btn,
+#tb-panel.visible .tb-sep {
+    animation: tb-in 0.18s ease both;
+}
+#tb-panel.visible .tb-btn:nth-child(1) { animation-delay: 0.01s; }
+#tb-panel.visible .tb-btn:nth-child(2) { animation-delay: 0.03s; }
+#tb-panel.visible .tb-btn:nth-child(3) { animation-delay: 0.05s; }
+#tb-panel.visible .tb-btn:nth-child(4) { animation-delay: 0.07s; }
+#tb-panel.visible .tb-btn:nth-child(5) { animation-delay: 0.09s; }
+#tb-panel.visible .tb-btn:nth-child(6) { animation-delay: 0.11s; }
+#tb-panel.visible .tb-btn:nth-child(7) { animation-delay: 0.13s; }
+#tb-panel.visible .tb-btn:nth-child(8) { animation-delay: 0.15s; }
+#tb-panel.visible .tb-btn:nth-child(9) { animation-delay: 0.17s; }
+#tb-panel.visible .tb-btn:nth-child(10) { animation-delay: 0.19s; }
+#tb-panel.visible .tb-btn:nth-child(11) { animation-delay: 0.21s; }
+#tb-panel.visible .tb-btn:nth-child(12) { animation-delay: 0.23s; }
+#tb-panel.visible .tb-btn:nth-child(13) { animation-delay: 0.25s; }
+#tb-panel.visible .tb-sep { animation-delay: 0.19s; }
+
 .tb-btn {
     display: flex; align-items: center; justify-content: center;
-    width: 42px; height: 42px; border-radius: 9px;
+    width: 40px; height: 40px; border-radius: 8px;
     color: #a1a1aa; background: transparent;
-    cursor: pointer; transition: 0.15s;
+    cursor: pointer;
     border: none; margin: 0; padding: 0; outline: none;
-    font-size: 20px;
+    font-size: 18px;
+    flex-shrink: 0;
 }
 .tb-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
 .tb-btn:has(input:checked) { color: #3b82f6; background: rgba(59,130,246,0.15); }
 .tb-create { background: rgba(59,130,246,0.15); color: #60a5fa; }
 .alarm-badge { position:absolute; top:-3px; right:-3px; background:#ef4444; color:#fff; border-radius:10px; padding:1px 4px; font-size:8px; font-weight:700; display:none; border:1.5px solid #18181b; line-height:1.2; }
-
-#tb-bar {
-    display: flex;
-    gap: 4px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    justify-content: center;
-}
-.tb-bar-btn {
-    display: flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; border-radius: 7px;
-    color: #a1a1aa; background: transparent;
-    cursor: pointer; transition: 0.15s;
-    border: none; margin: 0; padding: 0; outline: none;
-    font-size: 16px;
-}
-.tb-bar-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
-.tb-bar-btn:has(input:checked) { color: #3b82f6; background: rgba(59,130,246,0.15); }
+.tb-sep { height: 1px; background: rgba(255,255,255,0.06); margin: 2px 0; flex-shrink: 0; }
 
 /* ==========================================================================
     3. ESTRUTURA DOS MODAIS CENTRAIS (INVENTÁRIO E TRÁFEGO WIDE)
