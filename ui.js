@@ -1895,6 +1895,14 @@ export const ui = {
             if (e.key === 'Enter') btnSubmit?.click();
         });
 
+        document.getElementById('toggle-pass')?.addEventListener('click', () => {
+            const input = document.getElementById('login-password');
+            if (!input) return;
+            const hidden = input.getAttribute('type') === 'password';
+            input.setAttribute('type', hidden ? 'text' : 'password');
+            document.getElementById('toggle-pass').textContent = hidden ? 'ocultar' : 'ver';
+        });
+
         document.addEventListener('auth:expired', () => {
             ui.atualizarEstadoAuth();
             ui.mostrarLogin();
@@ -1904,6 +1912,10 @@ export const ui = {
     mostrarLogin: () => {
         const overlay = document.getElementById('login-overlay');
         if (overlay) overlay.style.display = 'flex';
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+        const err = document.getElementById('login-error');
+        if (err) err.style.display = 'none';
     },
 
     esconderLogin: () => {

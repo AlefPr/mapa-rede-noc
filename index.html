@@ -593,17 +593,24 @@
 
 <div id="login-overlay">
   <div class="login-panel">
+    <div class="login-brand">◆ noculys.io  ·  v2.0.1</div>
     <div class="login-header">
-      <h3>> noculys.io login</h3>
+      <h3>> autenticação</h3>
       <p>digite as credenciais de acesso</p>
     </div>
     <div id="login-error"></div>
-    <input id="login-username" type="text" placeholder="username" autocomplete="off" spellcheck="false">
-    <div class="login-pass-wrap">
-      <input id="login-password" type="password" placeholder="password" autocomplete="off">
-      <span id="toggle-pass">ver</span>
+    <div class="login-field">
+      <span class="login-prefix">> user</span>
+      <input id="login-username" type="text" placeholder="username" autocomplete="off" spellcheck="false">
     </div>
-    <button id="btn-login-submit"><i class="ph ph-sign-in"></i> Entrar</button>
+    <div class="login-field">
+      <span class="login-prefix">> pass</span>
+      <div class="login-pass-wrap">
+        <input id="login-password" type="password" placeholder="password" autocomplete="off">
+        <span id="toggle-pass">ver</span>
+      </div>
+    </div>
+    <button id="btn-login-submit"><i class="ph ph-sign-in"></i> Autenticar</button>
   </div>
 </div>
 
