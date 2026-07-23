@@ -42,8 +42,7 @@ if (valido) {
     }
     console.log(`✅ ${rotas.length} rotas carregadas.`);
 
-    const panelVisivel = document.getElementById('resumo-panel')?.style.display !== 'none';
-    if (panelVisivel && typeof ui.renderizarResumo === 'function') ui.renderizarResumo();
+    if (typeof ui.renderizarResumo === 'function') ui.renderizarResumo();
 
     // Kiosk Mode
     const urlParams = new URLSearchParams(window.location.search);

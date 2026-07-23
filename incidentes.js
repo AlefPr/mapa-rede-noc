@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { api } from './api.js';
 import { mapa } from './mapa.js';
 import { telemetria } from './telemetria.js';
+import { ui } from './ui.js';
 
 export const incidentes = {
     incidentesGlobais: [],
@@ -70,7 +71,7 @@ export const incidentes = {
                 if (typeof mapa.atualizarCoresDeSaude === 'function') {
                     mapa.atualizarCoresDeSaude();
                 }
-                const panelVisivel = document.getElementById('resumo-panel')?.style.display !== 'none';
+                const panelVisivel = document.getElementById('resumo-panel')?.classList.contains('visible');
                 if (panelVisivel && typeof ui.renderizarResumo === 'function') ui.renderizarResumo();
                 const drawerOpen = document.getElementById('route-drawer')?.classList.contains('open');
                 if (drawerOpen && state.rotaSelecionada) {
