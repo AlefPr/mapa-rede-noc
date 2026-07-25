@@ -65,11 +65,12 @@ exports.login = async (req, res) => {
 
     const token = gerarToken(usuario);
     logger.info(`Login bem-sucedido: ${username}`);
+    res.clearCookie('noc_auth_token', { path: '/mapa' });
     res.cookie('noc_auth_token', token, {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
-      path: '/mapa',
+      path: '/',
       maxAge: 24 * 60 * 60 * 1000
     });
     res.json({ token, usuario: { id: usuario.id, username: usuario.username } });
@@ -95,7 +96,7 @@ exports.logout = async (req, res) => {
     const hash = crypto.createHash('sha256').update(token).digest('hex');
     await redisClient.set(`blk:${hash}`, '1', { EX: 86400 });
 
-    res.clearCookie('noc_auth_token', { path: '/mapa' });
+    res.clearCookie('noc_auth_token', { path: '/' });
     logger.info(`Logout: ${req.usuario?.username || 'desconhecido'}`);
     res.json({ message: 'Sessão encerrada com sucesso.' });
   } catch (error) {
