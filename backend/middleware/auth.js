@@ -29,7 +29,7 @@ async function tokenBlacklisted(token) {
 
 async function autenticarToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : req.cookies?.noc_auth_token;
 
   if (!token) {
     return res.status(401).json({ error: 'Token de autenticação não fornecido.' });
@@ -56,7 +56,7 @@ async function autenticarToken(req, res, next) {
 
 function autenticarTokenOpcional(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : req.cookies?.noc_auth_token;
 
   if (!token) return next();
 

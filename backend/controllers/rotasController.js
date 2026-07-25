@@ -1,3 +1,4 @@
+const zabbixService = require("../services/zabbixService");
 const db = require('../db');
 const logger = require('../logger');
 
@@ -73,6 +74,9 @@ exports.criarRota = async (req, res, io) => {
 
     await connection.commit();
     
+    const trafficIds = [...(itemsIn||[]), ...(itemsOut||[]), ...(itemsStatus||[]), ...(itemsRx||[])];
+    autoDescobrirLatency(trafficIds, insertId).catch(() => {});
+    
     const [rotaSalva] = await db.execute('SELECT * FROM rotas WHERE id = ?', [insertId]);
     const [itemsSalvos] = await db.execute('SELECT * FROM rota_zabbix_items WHERE rota_id = ?', [insertId]);
     
@@ -135,6 +139,9 @@ exports.atualizarRota = async (req, res, io) => {
     }
 
     await connection.commit();
+
+    const trafficIds = [...(itemsIn||[]), ...(itemsOut||[]), ...(itemsStatus||[]), ...(itemsRx||[])];
+    autoDescobrirLatency(trafficIds, id).catch(() => {});
 
     const [rotaAtualizada] = await db.execute('SELECT * FROM rotas WHERE id = ?', [id]);
     const [itemsAtualizados] = await db.execute('SELECT * FROM rota_zabbix_items WHERE rota_id = ?', [id]);
@@ -220,3 +227,32 @@ exports.excluirRota = async (req, res, io) => {
     res.status(500).json({ error: 'Erro interno ao excluir.' });
   }
 };
+
+async function autoDescobrirLatency(itemIds, rotaId) {
+  if (!itemIds || itemIds.length === 0) return [];
+  try {
+    const items = await zabbixService.zabbixApiCall('item.get', {
+      output: ['itemid'],
+      itemids: itemIds.filter(Boolean),
+      selectHosts: ['hostid']
+    });
+    const hostIds = [...new Set(items.map(i => i.hosts?.[0]?.hostid).filter(Boolean))];
+    if (hostIds.length === 0) return [];
+    const latencyItems = await zabbixService.zabbixApiCall('item.get', {
+      output: ['itemid'],
+      hostids: hostIds,
+      filter: { key_: 'icmppingsec' }
+    });
+    const latencyIds = latencyItems.map(i => i.itemid).filter(Boolean);
+    if (latencyIds.length > 0) {
+      const sql = 'INSERT IGNORE INTO rota_zabbix_items (rota_id, zabbix_itemid, tipo_item) VALUES ?';
+      const vals = latencyIds.map(id => [rotaId, id, 'latency']);
+      await db.query(sql, [vals]);
+    }
+    return latencyIds;
+  } catch (error) {
+    logger.warn('Auto-descobrir latency falhou (nao critico): ' + error.message);
+    return [];
+  }
+}
+

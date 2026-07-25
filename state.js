@@ -45,7 +45,6 @@ export const state = {
     zoomDebounce: null, // Otimização de zoom
     
     // Autenticação
-    token: null,
     usuario: null,
     autenticado: false,
 

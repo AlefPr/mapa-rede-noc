@@ -1,24 +1,13 @@
 import { state } from './state.js';
-import { auth } from './auth.js';
-
-function headers(extra = {}) {
-  const h = { ...extra };
-  if (state.token) {
-    h['Authorization'] = `Bearer ${state.token}`;
-  }
-  return h;
-}
 
 async function authFetch(url, options = {}) {
   const res = await fetch(url, {
     ...options,
-    headers: { ...headers(options.headers), ...(options.body ? { 'Content-Type': 'application/json' } : {}) }
+    headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers }
   });
-  if (res.status === 401 && state.token) {
+  if (res.status === 401 && state.autenticado) {
     state.autenticado = false;
-    state.token = null;
     state.usuario = null;
-    auth.setToken(null);
     document.dispatchEvent(new CustomEvent('auth:expired'));
   }
   return res;

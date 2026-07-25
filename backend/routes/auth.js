@@ -35,7 +35,7 @@ module.exports = (app) => {
    *       201: { description: Utilizador registado }
    *       409: { description: Username já existe }
    */
-  app.post('/api/auth/registar', authController.registrar);
+  app.post('/api/auth/registar', autenticarToken, authController.registrar);
 
   /**
    * @openapi

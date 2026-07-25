@@ -48,9 +48,7 @@ export const incidentes = {
 
     conectarWebSocket: () => {
         if (typeof io !== 'undefined' && !incidentes.socket) {
-            incidentes.socket = io({
-                auth: { token: state.token || '' }
-            });
+            incidentes.socket = io();
 
             incidentes.socket.on('novoProblema', () => incidentes.carregarProblemas());
             incidentes.socket.on('problemaResolvido', () => incidentes.carregarProblemas());
@@ -77,9 +75,6 @@ export const incidentes = {
                 if (drawerOpen && state.rotaSelecionada) {
                     if (typeof telemetria.atualizarPainelSaude === 'function') {
                         telemetria.atualizarPainelSaude(state.rotaSelecionada);
-                    }
-                    if (typeof telemetria.renderizarMiniTrend === 'function') {
-                        telemetria.renderizarMiniTrend(state.rotaSelecionada);
                     }
                     if (typeof telemetria.renderHistorico === 'function') {
                         telemetria.renderHistorico(state.rotaSelecionada);

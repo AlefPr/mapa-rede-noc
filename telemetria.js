@@ -85,12 +85,20 @@ export const telemetria = {
         const kpiLat = document.getElementById('kpi-latency');
         const kpiJitter = document.getElementById('kpi-jitter');
         if (rota.zabbix_items?.latency) {
-            const vals = rota.zabbix_items.latency.map(id => parseFloat(state.zabbixCacheLocal[id]?.current) || 0).filter(v => v > 0);
-            if (kpiLat) kpiLat.textContent = vals.length > 0 ? vals.join(' / ') + ' ms' : '-- ms';
+            const vals = rota.zabbix_items.latency.map(id => {
+                const v = parseFloat(state.zabbixCacheLocal[id]?.current) || 0;
+                const u = state.zabbixCacheLocal[id]?.units;
+                return u === 's' ? v * 1000 : v;
+            }).filter(v => v > 0);
+            if (kpiLat) kpiLat.textContent = vals.length > 0 ? vals.map(v => v.toFixed(2)).join(' / ') + ' ms' : '-- ms';
         } else if (kpiLat) kpiLat.innerHTML = '<span class="empty-pulse">···</span>';
         if (rota.zabbix_items?.jitter) {
-            const vals = rota.zabbix_items.jitter.map(id => parseFloat(state.zabbixCacheLocal[id]?.current) || 0).filter(v => v > 0);
-            if (kpiJitter) kpiJitter.textContent = vals.length > 0 ? vals.join(' / ') + ' ms' : '-- ms';
+            const vals = rota.zabbix_items.jitter.map(id => {
+                const v = parseFloat(state.zabbixCacheLocal[id]?.current) || 0;
+                const u = state.zabbixCacheLocal[id]?.units;
+                return u === 's' ? v * 1000 : v;
+            }).filter(v => v > 0);
+            if (kpiJitter) kpiJitter.textContent = vals.length > 0 ? vals.map(v => v.toFixed(2)).join(' / ') + ' ms' : '-- ms';
         } else if (kpiJitter) kpiJitter.innerHTML = '<span class="empty-pulse">···</span>';
 
         let trafegoConsiderado = 0;
@@ -517,11 +525,9 @@ export const telemetria = {
                         const nomeExibicao = series.name.replace('RX ', '').replace(/[()]/g, '');
 
                         rxIndicatorsHTML += `
-                            <div onclick="if(state.rxChartInstance) { state.rxChartInstance.toggleSeries('${serieNameLimpo}'); this.style.opacity = this.style.opacity === '0.5' ? '1' : '0.5'; }" 
-                                 title="Clique para ocultar/mostrar esta Lane no gráfico"
-                                 style="background: rgba(255,255,255,0.03); border: 1px solid ${cor}40; border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; user-select: none;"
-                                 onmouseover="this.style.background='rgba(255,255,255,0.08)'"
-                                 onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                            <div class="rx-lane-card" data-series="${serieNameLimpo.replace(/"/g, '&quot;')}"
+                                 title="Clique para isolar esta Lane"
+                                 style="background: rgba(255,255,255,0.03); border: 1px solid ${cor}40; border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; user-select: none;">
                                 <i class="ph ${icone}" style="color: ${cor}; font-size: 18px;"></i>
                                 <div style="display: flex; flex-direction: column;">
                                     <span style="color: #94a3b8; font-size: 10px; font-weight: 700; text-transform: uppercase;">${nomeExibicao}</span>
@@ -535,6 +541,27 @@ export const telemetria = {
 
                 // 2. Prepara o espaço na tela (Cards em cima, Gráfico novo em baixo)
                 chartRxContainer.innerHTML = rxIndicatorsHTML + '<div id="rx-canvas" style="width: 100%; min-height: 200px;"></div>';
+
+                chartRxContainer.onclick = function laneClick(e) {
+                    const card = e.target.closest('.rx-lane-card');
+                    if (!card || !state.rxChartInstance) return;
+                    const todas = card.parentElement.querySelectorAll('.rx-lane-card');
+                    const jaAtiva = card.classList.contains('lane-ativa');
+                    todas.forEach(c => {
+                        state.rxChartInstance.showSeries(c.getAttribute('data-series'));
+                        c.classList.remove('lane-ativa');
+                        c.style.borderColor = '';
+                        c.style.background = 'rgba(255,255,255,0.03)';
+                    });
+                    if (!jaAtiva) {
+                        todas.forEach(c => {
+                            if (c !== card) state.rxChartInstance.hideSeries(c.getAttribute('data-series'));
+                        });
+                        card.classList.add('lane-ativa');
+                        card.style.borderColor = '#3b82f6';
+                        card.style.background = 'rgba(59,130,246,0.1)';
+                    }
+                };
 
                 // 3. Monta e plota o gráfico de histórico
                 const categories = rxData[0].data.map(d => formatarTimestamp(d.clock));

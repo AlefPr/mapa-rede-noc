@@ -67,8 +67,8 @@ exports.login = async (req, res) => {
     logger.info(`Login bem-sucedido: ${username}`);
     res.cookie('noc_auth_token', token, {
       httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'strict',
       path: '/mapa',
       maxAge: 24 * 60 * 60 * 1000
     });
@@ -86,7 +86,7 @@ exports.verificarToken = async (req, res) => {
 exports.logout = async (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : req.cookies?.noc_auth_token;
 
     if (!token) {
       return res.status(400).json({ error: 'Token não fornecido.' });

@@ -9,8 +9,6 @@ const cors = require('cors');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-const https = require('https');
-const fs = require('fs');
 const { Server } = require("socket.io");
 const zabbixService = require('./services/zabbixService');
 const redisClient = require('./redisClient');
@@ -19,15 +17,8 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 const FRONTEND_DIR = '/var/www/html/mapa';
 
-const sslKeyPath = process.env.SSL_KEY_PATH || '/etc/ssl/noc/server.key';
-const sslCertPath = process.env.SSL_CERT_PATH || '/etc/ssl/noc/server.crt';
-const sslOptions = {
-  key: fs.readFileSync(sslKeyPath),
-  cert: fs.readFileSync(sslCertPath)
-};
-
 const app = express();
-const server = https.createServer(sslOptions, app);
+const server = require('http').createServer(app);
 const frontendUrl = process.env.FRONTEND_URL || 'https://localhost';
 
 const allowedOrigins = [frontendUrl, frontendUrl.replace('http://', 'https://')];
@@ -78,10 +69,15 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://code.jquery.com", "https://unpkg.com", "https://maps.googleapis.com", "https://cdn.socket.io"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com"],
-      connectSrc: ["'self'", "ws:", "wss:", "http:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
       frameSrc: ["https://maps.googleapis.com"],
     }
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
   }
 }));
 app.use(compression());
@@ -131,7 +127,7 @@ io.on('connection', (socket) => {
   logger.info(`Novo cliente conectado! ID: ${socket.id}`);
 });
 
-app.get('/', (req, res) => res.json({ message: "API OK!" }));
+app.get('/', (req, res) => res.redirect('/mapa/'));
 
 // ==========================================
 // 1.5 MOTOR DE EXPIRAÇÃO DE MANUTENÇÃO
@@ -245,7 +241,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // ==========================================
 // 5. INICIALIZAÇÃO DO SERVIDOR
 // ==========================================
-server.listen(PORT, async () => {
+server.listen(PORT, '127.0.0.1', async () => {
   logger.info(`Servidor rodando na porta ${PORT}`);
   try {
     const db = require('./db');

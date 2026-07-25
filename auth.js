@@ -1,22 +1,8 @@
 import { state } from './state.js';
 
-const AUTH_KEY = 'noc_auth_token';
-
 export const auth = {
-  getToken() {
-    return localStorage.getItem(AUTH_KEY);
-  },
-
-  setToken(token) {
-    if (token) {
-      localStorage.setItem(AUTH_KEY, token);
-    } else {
-      localStorage.removeItem(AUTH_KEY);
-    }
-  },
-
   isAuthenticated() {
-    return !!this.getToken();
+    return state.autenticado;
   },
 
   async login(username, password) {
@@ -30,10 +16,8 @@ export const auth = {
       throw new Error(err.error || 'Credenciais inválidas');
     }
     const data = await res.json();
-    state.token = data.token;
     state.usuario = data.usuario;
     state.autenticado = true;
-    this.setToken(data.token);
     return data;
   },
 
@@ -51,44 +35,33 @@ export const auth = {
   },
 
   async logout() {
-    const token = this.getToken();
-    state.token = null;
     state.usuario = null;
     state.autenticado = false;
-    this.setToken(null);
-    if (token) {
-      try {
-        await fetch(`${state.API_URL_BASE}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      } catch {
-      }
+    try {
+      await fetch(`${state.API_URL_BASE}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch {
     }
   },
 
   async verify() {
-    const token = this.getToken();
-    if (!token) { console.warn('auth.verify: sem token'); return false; }
     try {
-      const res = await fetch(`${state.API_URL_BASE}/auth/verificar`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch(`${state.API_URL_BASE}/auth/verificar`);
       if (!res.ok) {
         console.warn('auth.verify: token rejeitado', res.status);
-        this.setToken(null);
+        state.autenticado = false;
+        state.usuario = null;
         return false;
       }
       const data = await res.json();
-      state.token = token;
       state.usuario = data.usuario;
       state.autenticado = true;
       return true;
     } catch (err) {
       console.warn('auth.verify: exceção', err);
+      state.autenticado = false;
       return false;
     }
   }

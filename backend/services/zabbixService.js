@@ -36,7 +36,7 @@ async function syncZabbixCache(io) {
     
     if (itemIds.length === 0) return;
 
-    const items = await zabbixApiCall('item.get', { output: ['itemid', 'lastvalue'], itemids: itemIds });
+    const items = await zabbixApiCall('item.get', { output: ['itemid', 'lastvalue', 'units'], itemids: itemIds });
     
     let zabbixCache = JSON.parse(await redisClient.get('zabbix_cache') || '{}');
     const previousCache = JSON.parse(JSON.stringify(zabbixCache));
@@ -46,9 +46,10 @@ async function syncZabbixCache(io) {
       const val = parseFloat(item.lastvalue) || 0;
 
       if (!zabbixCache[id]) {
-        zabbixCache[id] = { current: val, history: [] };
+        zabbixCache[id] = { current: val, history: [], units: item.units || "" };
       } else {
         zabbixCache[id].current = val;
+        zabbixCache[id].units = item.units || "";
       }
 
       zabbixCache[id].history.push(val);
@@ -101,7 +102,7 @@ async function syncZabbixCache(io) {
 
     logger.info(`Cache Zabbix sincronizado: ${items.length} itens atualizados.`);
   } catch (error) {
-    logger.error("Erro no Motor de Cache do Zabbix:", error.message);
+    logger.error(`Erro no Motor de Cache do Zabbix: ${error.message}`);
   } finally {
     isSyncing = false;
   }

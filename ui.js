@@ -754,7 +754,7 @@ export const ui = {
             for (let index = 0; index < numPorts; index++) {
                 const idIn = rota.zabbix_items.in ? rota.zabbix_items.in[index] : null;
                 const idOut = rota.zabbix_items.out ? rota.zabbix_items.out[index] : null;
-                const idRx = rota.zabbix_items.rx ? rota.zabbix_items.rx[index] : null;
+                const idRx = rota.zabbix_items.rx ? rota.zabbix_items.rx[Math.min(index, rota.zabbix_items.rx.length - 1)] : null;
 
                 const idRef = idIn || idOut || idRx;
                 let nomeReal = dicionarioNomes[idRef] || `Interface ${index + 1}`;
@@ -987,9 +987,6 @@ export const ui = {
 
             ui.atualizarBadgeManutencao(rota);
 
-            if (typeof telemetria.renderizarMiniTrend === 'function') {
-                telemetria.renderizarMiniTrend(rota);
-            }
             if (typeof telemetria.renderHistorico === 'function') {
                 telemetria.renderHistorico(rota);
             }
@@ -1170,11 +1167,16 @@ export const ui = {
         const capEl = document.getElementById('hc-cap');
         if (capEl) capEl.textContent = (rota.capacidade || '--') + ' ' + (rota.unidade || 'Gbps').toUpperCase();
 
-        const formatarMbps = (bps) => bps > 0 ? (bps / 1000000).toFixed(2) + ' Mbps' : '-- Mbps';
+        const formatarAuto = (bps) => {
+            if (!bps || bps <= 0) return '-- Mbps';
+            if (bps >= 1000000000000) return (bps / 1000000000000).toFixed(2) + ' Tbps';
+            if (bps >= 1000000000) return (bps / 1000000000).toFixed(2) + ' Gbps';
+            return (bps / 1000000).toFixed(2) + ' Mbps';
+        };
         const inEl = document.getElementById('hc-in');
         const outEl = document.getElementById('hc-out');
-        if (inEl) inEl.textContent = formatarMbps(valorIn);
-        if (outEl) outEl.textContent = formatarMbps(valorOut);
+        if (inEl) inEl.textContent = formatarAuto(valorIn);
+        if (outEl) outEl.textContent = formatarAuto(valorOut);
 
         const rxEl = document.getElementById('hc-rx');
         if (rxEl) {
@@ -1190,8 +1192,12 @@ export const ui = {
         const latencyEl = document.getElementById('hc-latency');
         if (latencyEl) {
             if (rota.zabbix_items?.latency) {
-                const vals = rota.zabbix_items.latency.map(id => parseFloat(state.zabbixCacheLocal[id]?.current) || 0).filter(v => v > 0);
-                latencyEl.textContent = vals.length > 0 ? vals.join(' / ') + ' ms' : '-- ms';
+                const vals = rota.zabbix_items.latency.map(id => {
+                    const v = parseFloat(state.zabbixCacheLocal[id]?.current) || 0;
+                    const u = state.zabbixCacheLocal[id]?.units;
+                    return u === 's' ? v * 1000 : v;
+                }).filter(v => v > 0);
+                latencyEl.textContent = vals.length > 0 ? vals.map(v => v.toFixed(2)).join(' / ') + ' ms' : '-- ms';
                 const media = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
                 latencyEl.style.color = media > 100 ? '#ef4444' : media > 50 ? '#f59e0b' : '#60a5fa';
             } else {
