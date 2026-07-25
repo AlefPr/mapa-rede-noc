@@ -76,9 +76,6 @@ export const incidentes = {
                     if (typeof telemetria.atualizarPainelSaude === 'function') {
                         telemetria.atualizarPainelSaude(state.rotaSelecionada);
                     }
-                    if (typeof telemetria.renderHistorico === 'function') {
-                        telemetria.renderHistorico(state.rotaSelecionada);
-                    }
                 }
             });
         }

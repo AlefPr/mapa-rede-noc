@@ -987,10 +987,6 @@ export const ui = {
 
             ui.atualizarBadgeManutencao(rota);
 
-            if (typeof telemetria.renderHistorico === 'function') {
-                telemetria.renderHistorico(rota);
-            }
-
             // INTELIGÊNCIA GEOGRÁFICA
             const elDist = document.getElementById('route-distance-value');
             const elOrigem = document.getElementById('ui-route-origin');
