@@ -1,4 +1,5 @@
 const axios = require('axios');
+const https = require('https');
 const db = require('../db');
 const redisClient = require('../redisClient');
 const logger = require('../logger');
@@ -7,6 +8,8 @@ const GLOBAL_ZABBIX_API_URL = process.env.ZABBIX_API_URL;
 const ZABBIX_TOKEN = process.env.ZABBIX_API_TOKEN;
 const ZABBIX_REQUEST_TIMEOUT = parseInt(process.env.ZABBIX_REQUEST_TIMEOUT) || 15000;
 const CACHE_HISTORY_LIMIT = parseInt(process.env.CACHE_HISTORY_LIMIT) || 120;
+
+const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 let isSyncing = false;
 
@@ -17,7 +20,7 @@ async function zabbixApiCall(method, params) {
     params: params,
     auth: ZABBIX_TOKEN,
     id: 1
-  }, { timeout: ZABBIX_REQUEST_TIMEOUT });
+  }, { timeout: ZABBIX_REQUEST_TIMEOUT, httpsAgent });
   if (response.data.error) throw new Error(response.data.error.data);
   return response.data.result;
 }
