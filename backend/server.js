@@ -16,6 +16,7 @@ const logger = require('./logger');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const FRONTEND_DIR = '/var/www/html/mapa';
+const FLOW_DIR = path.join(__dirname, '..', 'flow');
 
 const app = express();
 const server = require('http').createServer(app);
@@ -104,6 +105,7 @@ app.get('/mapa/health', async (req, res) => {
 });
 
 app.use('/mapa', express.static(FRONTEND_DIR));
+app.use('/flow', express.static(FLOW_DIR));
 
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000,
@@ -199,6 +201,7 @@ require('./routes/sla')(app);
 require('./routes/historico')(app);
 require('./routes/templates')(app);
 require('./routes/problemas')(app, io);
+require('./routes/flow')(app, io);
 require('./routes/swagger')(app);
 
 // Middleware de erros (deve ser o último)

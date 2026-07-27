@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flow Analysis — NOC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts/dist/apexcharts.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Bar -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <span class="topbar-logo">📊 Flow Analysis</span>
+        <span class="topbar-separator"></span>
+        <a href="/mapa/" class="topbar-link">← Mapa</a>
+      </div>
+      <div class="topbar-right">
+        <span id="user-indicator" class="topbar-user"></span>
+        <span id="last-update" class="topbar-update">--</span>
+      </div>
+    </header>
+
+    <!-- Layout -->
+    <div id="layout">
+      <!-- Sidebar -->
+      <aside id="sidebar">
+        <button class="sbtn active" data-view="dashboard">
+          <span class="sbtn-icon">📈</span>
+          <span class="sbtn-label">Dashboard</span>
+        </button>
+        <button class="sbtn" data-view="top-talkers">
+          <span class="sbtn-icon">🏆</span>
+          <span class="sbtn-label">Top Talkers</span>
+        </button>
+        <button class="sbtn" data-view="investigar">
+          <span class="sbtn-icon">🔍</span>
+          <span class="sbtn-label">Investigar IP</span>
+        </button>
+        <button class="sbtn" data-view="geo">
+          <span class="sbtn-icon">🌍</span>
+          <span class="sbtn-label">Geo Mapa</span>
+        </button>
+        <button class="sbtn" data-view="ataques">
+          <span class="sbtn-icon">⚡</span>
+          <span class="sbtn-label">Ataques</span>
+        </button>
+      </aside>
+
+      <!-- Content -->
+      <main id="content">
+        <div id="view-dashboard" class="view active"></div>
+        <div id="view-top-talkers" class="view"></div>
+        <div id="view-investigar" class="view"></div>
+        <div id="view-geo" class="view"></div>
+        <div id="view-ataques" class="view"></div>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script type="module" src="flow.js"></script>
+</body>
+</html>
