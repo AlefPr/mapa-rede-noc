@@ -14,15 +14,19 @@ const zabbixService = require('./services/zabbixService');
 const redisClient = require('./redisClient');
 const logger = require('./logger');
 const { errorHandler } = require('./middleware/errorHandler');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
 const FRONTEND_DIR = '/var/www/html/mapa';
 const FLOW_DIR = path.join(__dirname, '..', 'flow');
+const LANDING_DIR = path.join(__dirname, '..', 'landing');
 
 const app = express();
 const server = require('http').createServer(app);
 const frontendUrl = process.env.FRONTEND_URL || 'https://localhost';
 
-const allowedOrigins = [frontendUrl, frontendUrl.replace('http://', 'https://')];
+const allowedOrigins = [frontendUrl, frontendUrl.replace('http://', 'https://'), 'http://localhost:3000', 'https://localhost:3000'];
 if (process.env.FRONTEND_URLS) {
   process.env.FRONTEND_URLS.split(',').forEach(o => {
     const url = o.trim();
@@ -69,9 +73,9 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://code.jquery.com", "https://unpkg.com", "https://maps.googleapis.com", "https://cdn.socket.io"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com", "https://*.basemaps.cartocdn.com", "https://unpkg.com"],
       connectSrc: ["'self'", "ws:", "wss:", "https://maps.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
       frameSrc: ["https://maps.googleapis.com"],
     }
   },
@@ -90,7 +94,7 @@ app.set('trust proxy', 1);
 // ── Proxy /mapa: serve frontend com verificação de cookie JWT ──
 // Rotas públicas (sem auth)
 app.get('/mapa/health', async (req, res) => {
-  const health = { status: 'ok', timestamp: new Date().toISOString(), mariadb: false, redis: false };
+  const health = { status: 'ok', timestamp: new Date().toISOString(), mariadb: false, redis: false, nfacctd: false, cpu: 0, memory: 0 };
   try {
     const db = require('./db');
     const conn = await db.getConnection();
@@ -101,6 +105,16 @@ app.get('/mapa/health', async (req, res) => {
     const ping = await redisClient.ping();
     health.redis = ping === 'PONG';
   } catch { health.redis = false; }
+  try {
+    await execAsync('pgrep -x nfacctd');
+    health.nfacctd = true;
+  } catch { health.nfacctd = false; }
+  try {
+    const loadAvg = os.loadavg()[0];
+    const cpuCount = os.cpus().length;
+    health.cpu = Math.min(Math.round((loadAvg / cpuCount) * 100), 100);
+    health.memory = Math.round((1 - os.freemem() / os.totalmem()) * 100);
+  } catch {}
   res.json(health);
 });
 
@@ -129,7 +143,7 @@ io.on('connection', (socket) => {
   logger.info(`Novo cliente conectado! ID: ${socket.id}`);
 });
 
-app.get('/', (req, res) => res.redirect('/mapa/'));
+app.use('/', express.static(LANDING_DIR));
 
 // ==========================================
 // 1.5 MOTOR DE EXPIRAÇÃO DE MANUTENÇÃO

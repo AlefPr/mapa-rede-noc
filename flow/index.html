@@ -3,65 +3,405 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flow Analysis — NOC</title>
+    <title>noculys.io · Flow</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/phosphor-icons@1.4.2/src/css/icons.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts/dist/apexcharts.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
-    <!-- Top Bar -->
+
     <header id="topbar">
-      <div class="topbar-left">
-        <span class="topbar-logo">📊 Flow Analysis</span>
-        <span class="topbar-separator"></span>
-        <a href="/mapa/" class="topbar-link">← Mapa</a>
+      <div class="tb-left">
+        <span class="tb-logo"><span class="logo-dot"></span>noculys<span class="logo-dot">.</span>io</span>
+        <div class="tb-search">
+          <i class="ph ph-magnifying-glass"></i>
+          <input type="text" id="tb-search-input" placeholder="Buscar IP..." spellcheck="false">
+        </div>
       </div>
-      <div class="topbar-right">
-        <span id="user-indicator" class="topbar-user"></span>
-        <span id="last-update" class="topbar-update">--</span>
+      <div class="tb-right">
+        <div class="tb-sysinfo">
+          <span class="sys-item">CPU <span class="sys-bar" id="cpu-bar"><span class="sys-fill"></span></span><span class="sys-val" id="cpu-val">0%</span></span>
+          <span class="sys-item">MEM <span class="sys-bar" id="mem-bar"><span class="sys-fill"></span></span><span class="sys-val" id="mem-val">0%</span></span>
+        </div>
+        <button class="tb-btn" id="theme-toggle" title="Alternar tema"><i class="ph ph-sun-dim"></i></button>
+        <button class="tb-btn" id="notif-btn" title="Notificações"><i class="ph ph-bell"></i><span id="notif-badge" class="notif-badge hidden">0</span></button>
+        <span class="tb-avatar" id="user-avatar"></span>
       </div>
     </header>
 
-    <!-- Layout -->
     <div id="layout">
-      <!-- Sidebar -->
+
       <aside id="sidebar">
-        <button class="sbtn active" data-view="dashboard">
-          <span class="sbtn-icon">📈</span>
-          <span class="sbtn-label">Dashboard</span>
-        </button>
-        <button class="sbtn" data-view="top-talkers">
-          <span class="sbtn-icon">🏆</span>
-          <span class="sbtn-label">Top Talkers</span>
-        </button>
-        <button class="sbtn" data-view="investigar">
-          <span class="sbtn-icon">🔍</span>
-          <span class="sbtn-label">Investigar IP</span>
-        </button>
-        <button class="sbtn" data-view="geo">
-          <span class="sbtn-icon">🌍</span>
-          <span class="sbtn-label">Geo Mapa</span>
-        </button>
-        <button class="sbtn" data-view="ataques">
-          <span class="sbtn-icon">⚡</span>
-          <span class="sbtn-label">Ataques</span>
-        </button>
+        <nav class="sb-nav">
+          <button class="sb-btn active" data-view="visao-geral" title="Dashboard">
+            <i class="ph ph-graph"></i>
+          </button>
+          <div class="sb-divider"></div>
+          <button class="sb-btn" data-view="top-talkers" title="Top Talkers">
+            <i class="ph ph-trophy"></i>
+          </button>
+          <button class="sb-btn" data-view="buscar" title="Buscar IP">
+            <i class="ph ph-magnifying-glass"></i>
+          </button>
+          <button class="sb-btn" data-view="ataques" id="sb-ataques" title="Ataques">
+            <i class="ph ph-shield-slash"></i>
+          </button>
+          <div class="sb-divider"></div>
+          <button class="sb-btn" data-view="global" title="Mapa Global">
+            <i class="ph ph-globe"></i>
+          </button>
+          <button class="sb-btn" data-view="comparar" title="Comparar">
+            <i class="ph ph-chart-bar"></i>
+          </button>
+          <div class="sb-divider"></div>
+          <button class="sb-btn" data-view="asn" title="ASN / Redes">
+            <i class="ph ph-buildings"></i>
+          </button>
+          <button class="sb-btn" data-view="subnets" title="Sub-redes">
+            <i class="ph ph-globe-hemisphere-west"></i>
+          </button>
+          <button class="sb-btn" data-view="matriz" title="Matriz ASN">
+            <i class="ph ph-graph"></i>
+          </button>
+        </nav>
       </aside>
 
-      <!-- Content -->
       <main id="content">
-        <div id="view-dashboard" class="view active"></div>
-        <div id="view-top-talkers" class="view"></div>
-        <div id="view-investigar" class="view"></div>
-        <div id="view-geo" class="view"></div>
-        <div id="view-ataques" class="view"></div>
+
+        <div class="page-head">
+          <div class="ph-left">
+            <h1 class="ph-title" id="view-title">Dashboard</h1>
+            <span class="ph-sub" id="view-subtitle">monitoramento de tráfego em tempo real</span>
+          </div>
+          <div class="ph-right">
+            <div class="ph-period" id="period-bar">
+              <button class="per-btn active" data-period="30m">30m</button>
+              <button class="per-btn" data-period="1h">1h</button>
+              <button class="per-btn" data-period="6h">6h</button>
+              <button class="per-btn" data-period="24h">24h</button>
+              <button class="per-btn" data-period="7d">7d</button>
+            </div>
+            <button class="ph-btn" id="ph-refresh" title="Atualizar"><i class="ph ph-arrows-clockwise"></i></button>
+            <button class="ph-btn" id="ph-fullscreen" title="Tela cheia"><i class="ph ph-arrows-out"></i></button>
+            <span class="ph-update" id="last-update">--</span>
+          </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="view-visao-geral" class="view active">
+          <div class="dash-grid">
+            <div class="card card-chart">
+              <div class="card-head">
+                <span class="card-title">Tráfego</span>
+                <span class="card-sub" style="font-size:10px;color:var(--text-muted);margin-left:8px;font-weight:400;">apenas externo</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div id="vg-chart"></div>
+            </div>
+            <div class="card card-kpis">
+              <div class="card-head">
+                <span class="card-title">Visão Geral</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="refresh-kpis" title="Atualizar"><i class="ph ph-arrows-clockwise"></i></button>
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div id="vg-kpis" class="mini-kpis"></div>
+            </div>
+            <div class="card card-metricas">
+              <div class="card-head">
+                <span class="card-title">Capacidade</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div id="vg-metricas" style="padding:4px 0;"></div>
+            </div>
+            <div class="card card-protocolos">
+              <div class="card-head">
+                <span class="card-title">Protocolos</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div id="vg-protocolos" style="display:flex;gap:12px;align-items:center;padding:4px 12px 8px;">
+                <div id="vg-protocolos-chart" style="width:130px;height:130px;flex-shrink:0;"></div>
+                <div style="flex:1;min-width:0;">
+                  <div id="vg-protocolos-legenda"></div>
+                </div>
+              </div>
+              <div id="vg-protocolos-footer" style="padding:6px 12px 8px;font-size:10px;color:var(--text-dim);border-top:1px solid var(--border);"></div>
+            </div>
+            <div class="live-feed-wrap">
+              <div class="card" id="live-feed-card">
+                <div class="card-head">
+                  <span class="card-title">Flows ao Vivo</span>
+                  <div class="card-actions">
+                    <span class="live-ago" id="live-ago">—</span>
+                    <span class="live-dot" id="live-dot" title="Desconectado"></span>
+                  </div>
+                </div>
+                <div id="live-feed-body" class="live-feed-body">
+                  <div class="live-feed-empty" id="live-feed-empty">conectando ao servidor...</div>
+                </div>
+              </div>
+            </div>
+            <div class="card card-talkers">
+              <div class="card-head">
+                <span class="card-title">Top Talkers</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="navigate" data-view="top-talkers" title="Abrir Top Talkers"><i class="ph ph-arrows-out"></i></button>
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div id="vg-talkers" class="vg-table-body"></div>
+            </div>
+            <div class="card card-ataques">
+              <div class="card-head">
+                <span class="card-title">Ataques</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="navigate" data-view="ataques" title="Abrir Ataques"><i class="ph ph-arrows-out"></i></button>
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div id="vg-banner" class="vg-banner hidden"></div>
+              <div id="vg-ataques-list"></div>
+            </div>
+            <div class="card card-semanal">
+              <div class="card-head">
+                <span class="card-title">Comparativo Semanal</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div id="vg-semanal" style="padding:4px 0;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Talkers -->
+        <div id="view-top-talkers" class="view">
+          <div class="tt-grid">
+            <div class="card">
+              <div class="card-head">
+                <span class="card-title">Top IPs Origem</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div class="card-body tt-wrap" id="tt-src"></div>
+            </div>
+            <div class="card">
+              <div class="card-head">
+                <span class="card-title">Top IPs Destino</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div class="card-body tt-wrap" id="tt-dst"></div>
+            </div>
+            <div class="card">
+              <div class="card-head">
+                <span class="card-title">Top Portas</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div class="card-body tt-wrap" id="tt-port"></div>
+            </div>
+            <div class="card">
+              <div class="card-head">
+                <span class="card-title">Protocolos</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div class="card-body tt-wrap" id="tt-proto"></div>
+            </div>
+          </div>
+          <div class="tt-apps-wrap">
+            <div class="card">
+              <div class="card-head">
+                <span class="card-title">Aplicações</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+              <div id="tt-apps" class="tt-apps-body"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Buscar IP -->
+        <div id="view-buscar" class="view">
+          <div class="card">
+              <div class="card-head">
+                <span class="card-title">Buscar IP</span>
+                <div class="card-actions">
+                  <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+              </div>
+            <div class="buscar-box">
+              <input type="text" id="buscar-input" placeholder="ex: 10.0.0.1" spellcheck="false" class="buscar-input">
+              <button id="buscar-btn" class="buscar-btn">Buscar</button>
+            </div>
+            <div id="buscar-period" class="buscar-period">
+              <span class="per-label">Período</span>
+              <button class="per-btn active" data-period="6h">6h</button>
+              <button class="per-btn" data-period="24h">24h</button>
+              <button class="per-btn" data-period="7d">7d</button>
+            </div>
+          </div>
+          <div id="buscar-results"></div>
+        </div>
+
+        <!-- Ataques -->
+        <div id="view-ataques" class="view">
+          <div class="card card-atk-timeline">
+            <div class="card-head">
+              <span class="card-title">Timeline de Ataques (24h)</span>
+              <div class="card-actions">
+                <button class="ca-btn" data-action="menu" title="Mais"><i class="ph ph-dots-three-vertical"></i></button>
+              </div>
+            </div>
+            <div id="atk-timeline-chart" style="height:140px;"></div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Detecção de Ataques</span>
+              <button class="ca-btn" id="atk-refresh" title="Atualizar"><i class="ph ph-arrows-clockwise"></i></button>
+            </div>
+            <div id="atk-table"></div>
+          </div>
+        </div>
+
+        <!-- Global -->
+        <div id="view-global" class="view">
+          <div class="global-layout">
+            <div class="card global-map-card">
+              <div id="global-map" style="height: 500px; border-radius: 6px; overflow: hidden;"></div>
+              <div class="global-map-empty" id="global-map-empty">carregando mapa global...</div>
+            </div>
+            <div class="global-side">
+              <div class="card">
+                <div class="card-head"><span class="card-title">Top Países</span></div>
+                <div id="global-countries" class="global-list"><div class="global-empty">sem dados</div></div>
+              </div>
+              <div class="card">
+                <div class="card-head"><span class="card-title">Top Cidades</span></div>
+                <div id="global-cities" class="global-list"><div class="global-empty">sem dados</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comparar -->
+        <div id="view-comparar" class="view">
+          <div class="cmp-controls">
+            <div class="cmp-group">
+              <span class="cmp-label">Período A</span>
+              <div class="cmp-period" id="cmp-period-1">
+                <button class="per-btn active" data-period="30m">30m</button>
+                <button class="per-btn" data-period="1h">1h</button>
+                <button class="per-btn" data-period="6h">6h</button>
+                <button class="per-btn" data-period="24h">24h</button>
+              </div>
+            </div>
+            <div class="cmp-group">
+              <span class="cmp-label">Período B</span>
+              <div class="cmp-period" id="cmp-period-2">
+                <button class="per-btn" data-period="30m">30m</button>
+                <button class="per-btn active" data-period="6h">6h</button>
+                <button class="per-btn" data-period="24h">24h</button>
+                <button class="per-btn" data-period="7d">7d</button>
+              </div>
+            </div>
+          </div>
+          <div class="cmp-grid">
+            <div class="card">
+              <div class="card-head"><span class="card-title" id="cmp-title-1">Período A</span></div>
+              <div id="cmp-chart-1" class="cmp-chart"></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><span class="card-title" id="cmp-title-2">Período B</span></div>
+              <div id="cmp-chart-2" class="cmp-chart"></div>
+            </div>
+          </div>
+          <div class="cmp-summary card">
+            <div class="card-head"><span class="card-title">Comparativo</span></div>
+            <div id="cmp-metrics" class="cmp-metrics"></div>
+          </div>
+        </div>
+
+        <!-- ASN / Redes -->
+        <div id="view-matriz" class="view">
+          <div class="asn-toolbar">
+            <div class="asn-search">
+              <i class="ph ph-magnifying-glass"></i>
+              <input type="text" id="matriz-search" placeholder="Filtrar por ASN ou org..." spellcheck="false">
+            </div>
+            <div class="asn-stats" id="matriz-stats"></div>
+          </div>
+          <div class="asn-table-wrap card">
+            <div id="matriz-header" class="card-head"><span class="card-title">Matriz de Tráfego por ASN</span></div>
+            <div id="matriz-body" class="asn-body"></div>
+          </div>
+        </div>
+
+        <div id="view-subnets" class="view">
+          <div class="asn-toolbar">
+            <div class="asn-search">
+              <i class="ph ph-magnifying-glass"></i>
+              <input type="text" id="subnets-search" placeholder="Filtrar sub-rede..." spellcheck="false">
+            </div>
+            <div class="asn-stats" id="subnets-stats"></div>
+          </div>
+          <div class="asn-table-wrap card">
+            <div id="subnets-header" class="card-head">
+              <span class="card-title">Top Sub-redes</span>
+              <div class="card-actions" style="gap:4px;">
+                <button class="per-btn subnet-prefix active" data-prefix="24">/24</button>
+                <button class="per-btn subnet-prefix" data-prefix="20">/20</button>
+                <button class="per-btn subnet-prefix" data-prefix="16">/16</button>
+                <button class="ca-btn" data-action="subnet-side" title="Lado"><i class="ph ph-arrows-left-right"></i></button>
+              </div>
+            </div>
+            <div id="subnets-body" class="asn-body"></div>
+          </div>
+        </div>
+
+        <div id="view-asn" class="view">
+          <div class="asn-toolbar">
+            <div class="asn-search">
+              <i class="ph ph-magnifying-glass"></i>
+              <input type="text" id="asn-search" placeholder="Filtrar por ASN, org ou IP..." spellcheck="false">
+            </div>
+            <div class="asn-stats" id="asn-stats"></div>
+          </div>
+          <div class="asn-table-wrap card">
+            <div id="asn-header" class="card-head"><span class="card-title">Sistemas Autônomos (ASN)</span></div>
+            <div id="asn-body" class="asn-body"></div>
+          </div>
+        </div>
+
       </main>
     </div>
+
+    <footer id="footer">
+      <span>© 2026 NOC</span>
+      <a href="/" class="ft-link">⌂ Launcher</a>
+    </footer>
+
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io@4.7.2/client-dist/socket.io.min.js"></script>
   <script type="module" src="flow.js"></script>
 </body>
 </html>

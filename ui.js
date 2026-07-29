@@ -511,28 +511,6 @@ export const ui = {
             }
 
             // ==========================================
-            // TEMPLATES
-            // ==========================================
-            if (target.matches('#btn-salvar-template') || target.closest('#btn-salvar-template')) {
-                ui.abrirModalSalvarTemplate();
-            }
-            if (target.matches('#btn-aplicar-template') || target.closest('#btn-aplicar-template')) {
-                ui.abrirModalAplicarTemplate();
-            }
-            if (target.matches('#btn-confirmar-template') || target.closest('#btn-confirmar-template')) {
-                ui.salvarTemplate();
-            }
-            if (target.matches('#fechar-template-modal') || target.closest('#fechar-template-modal')) {
-                document.getElementById('template-modal').style.display = 'none';
-            }
-            if (target.matches('#fechar-aplicar-template') || target.closest('#fechar-aplicar-template')) {
-                document.getElementById('aplicar-template-modal').style.display = 'none';
-            }
-            if (target.matches('.btn-aplicar-template-item') || target.closest('.btn-aplicar-template-item')) {
-                const btn = target.closest('.btn-aplicar-template-item');
-                ui.aplicarTemplate(parseInt(btn.dataset.id));
-            }
-
             if (target.matches('#close-inventory-button') || target.closest('#close-inventory-button')) {
                 const modal = document.getElementById('inventory-modal');
                 if (modal) modal.classList.remove('visible');
@@ -681,6 +659,17 @@ export const ui = {
                     copyBtn.click();
                 }
                 return;
+            }
+
+            // Esc Esc → Launcher
+            if (e.key === 'Escape' && !e.target.closest('input,textarea,select,[contenteditable]')) {
+                const now = Date.now();
+                if (window.__lastEsc && (now - window.__lastEsc) < 500) {
+                    window.__lastEsc = 0;
+                    window.location.href = '/';
+                } else {
+                    window.__lastEsc = now;
+                }
             }
         });
 
@@ -928,9 +917,6 @@ export const ui = {
 
         if (rota) {
             if (btnExcluir) btnExcluir.style.display = 'inline-block';
-            const btnTemplate = document.getElementById('btn-salvar-template');
-            if (btnTemplate) btnTemplate.style.display = rota.zabbix_items ? 'inline-flex' : 'none';
-
             const idsInput = {
                 'route-name': rota.nome_rota || '',
                 'route-color': rota.cor || '#3b82f6',
@@ -1861,8 +1847,7 @@ export const ui = {
 
         btnLogout?.addEventListener('click', async () => {
             await auth.logout();
-            ui.atualizarEstadoAuth();
-            ui.mostrarLogin();
+            window.location.href = '/';
         });
 
         btnSubmit?.addEventListener('click', async () => {
@@ -2043,7 +2028,6 @@ export const ui = {
 
         const maintBtn = document.getElementById('btn-manutencao-rota');
 
-        const templateBtn = document.getElementById('btn-aplicar-template');
         const inventoryBtn = document.getElementById('open-inventory-button');
 
         if (state.autenticado) {
@@ -2051,7 +2035,6 @@ export const ui = {
             if (btnLogout) btnLogout.style.display = 'flex';
             if (createBtn) createBtn.style.display = 'flex';
             if (deleteBtn) deleteBtn.style.display = 'flex';
-            if (templateBtn) templateBtn.style.display = 'flex';
             if (inventoryBtn) inventoryBtn.style.display = 'flex';
             if (limparBtn) limparBtn.style.display = 'inline-block';
             if (maintBtn) maintBtn.style.display = 'inline-flex';
@@ -2060,7 +2043,6 @@ export const ui = {
             if (btnLogout) btnLogout.style.display = 'none';
             if (createBtn) createBtn.style.display = 'none';
             if (deleteBtn) deleteBtn.style.display = 'none';
-            if (templateBtn) templateBtn.style.display = 'none';
             if (inventoryBtn) inventoryBtn.style.display = 'none';
             if (limparBtn) limparBtn.style.display = 'none';
             if (maintBtn) maintBtn.style.display = 'none';
@@ -2080,115 +2062,4 @@ export const ui = {
         }
     },
 
-    // ==========================================
-    // TEMPLATES DE ROTAS
-    // ==========================================
-    abrirModalSalvarTemplate: () => {
-        const modal = document.getElementById('template-modal');
-        if (!modal) return;
-        document.getElementById('template-modal-title').textContent = 'Salvar como Template';
-        document.getElementById('template-nome').value = '';
-        document.getElementById('template-descricao').value = '';
-        const rota = state.rotaSelecionada;
-        if (rota?.zabbix_items) {
-            document.getElementById('tmp-inc-in').checked = !!rota.zabbix_items.in?.length;
-            document.getElementById('tmp-inc-out').checked = !!rota.zabbix_items.out?.length;
-            document.getElementById('tmp-inc-rx').checked = !!rota.zabbix_items.rx?.length;
-            document.getElementById('tmp-inc-status').checked = !!rota.zabbix_items.status?.length;
-            document.getElementById('tmp-inc-latency').checked = !!rota.zabbix_items.latency?.length;
-            document.getElementById('tmp-inc-jitter').checked = !!rota.zabbix_items.jitter?.length;
-        }
-        modal.style.display = 'flex';
-    },
-
-    salvarTemplate: async () => {
-        const nome = document.getElementById('template-nome').value.trim();
-        if (!nome) { ui.mostrarToast('Informe um nome para o template.', 'error'); return; }
-        const descricao = document.getElementById('template-descricao').value.trim();
-        const rota = state.rotaSelecionada;
-        if (!rota?.zabbix_items) { ui.mostrarToast('Nenhum item Zabbix na rota atual.', 'error'); return; }
-        const itens_zabbix = {};
-        if (document.getElementById('tmp-inc-in').checked && rota.zabbix_items.in?.length) itens_zabbix.in = rota.zabbix_items.in;
-        if (document.getElementById('tmp-inc-out').checked && rota.zabbix_items.out?.length) itens_zabbix.out = rota.zabbix_items.out;
-        if (document.getElementById('tmp-inc-rx').checked && rota.zabbix_items.rx?.length) itens_zabbix.rx = rota.zabbix_items.rx;
-        if (document.getElementById('tmp-inc-status').checked && rota.zabbix_items.status?.length) itens_zabbix.status = rota.zabbix_items.status;
-        if (document.getElementById('tmp-inc-latency').checked && rota.zabbix_items.latency?.length) itens_zabbix.latency = rota.zabbix_items.latency;
-        if (document.getElementById('tmp-inc-jitter').checked && rota.zabbix_items.jitter?.length) itens_zabbix.jitter = rota.zabbix_items.jitter;
-        try {
-            await api.criarTemplate({ nome, descricao, itens_zabbix });
-            document.getElementById('template-modal').style.display = 'none';
-            ui.mostrarToast('Template salvo com sucesso!', 'success');
-        } catch (e) {
-            ui.mostrarToast('Erro ao salvar template.', 'error');
-        }
-    },
-
-    abrirModalAplicarTemplate: async () => {
-        const modal = document.getElementById('aplicar-template-modal');
-        if (!modal) return;
-        modal.style.display = 'flex';
-        const container = document.getElementById('lista-templates');
-        const emptyMsg = document.getElementById('sem-templates');
-        if (!container) return;
-        container.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;"><i class="ph ph-spinner ph-spin" style="font-size:24px;"></i></div>';
-        try {
-            const templates = await api.listarTemplates();
-            if (!templates || templates.length === 0) {
-                if (emptyMsg) emptyMsg.style.display = 'block';
-                container.innerHTML = '';
-                return;
-            }
-            if (emptyMsg) emptyMsg.style.display = 'none';
-            container.innerHTML = templates.map(t => `
-                <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:14px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.06);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div>
-                            <div style="font-size:14px;font-weight:600;color:#e2e8f0;">${t.nome}</div>
-                            ${t.descricao ? '<div style="font-size:12px;color:#64748b;margin-top:2px;">' + t.descricao + '</div>' : ''}
-                            <div style="font-size:11px;color:#52525b;margin-top:4px;">
-                                ${(() => { const info = []; try { const itens = typeof t.itens_zabbix === 'string' ? JSON.parse(t.itens_zabbix) : t.itens_zabbix; if (itens) { Object.keys(itens).forEach(k => info.push(k)); } } catch(e){} return info.join(' · ') || 'sem itens'; })()}
-                            </div>
-                        </div>
-                        <button class="btn-aplicar-template-item btn-secondary" data-id="${t.id}" style="padding:6px 14px;font-size:12px;flex-shrink:0;">Aplicar</button>
-                    </div>
-                </div>
-            `).join('');
-        } catch (e) {
-            container.innerHTML = '<div style="text-align:center;padding:20px;color:#ef4444;">Erro ao carregar templates.</div>';
-        }
-    },
-
-    aplicarTemplate: async (templateId) => {
-        try {
-            const templates = await api.listarTemplates();
-            const t = templates.find(x => x.id === templateId);
-            if (!t) { ui.mostrarToast('Template não encontrado.', 'error'); return; }
-            let itens = t.itens_zabbix;
-            if (typeof itens === 'string') itens = JSON.parse(itens);
-            if (!itens || Object.keys(itens).length === 0) { ui.mostrarToast('Template vazio.', 'error'); return; }
-
-            const rota = state.rotaSelecionada;
-            if (!rota) {
-                const nome = document.getElementById('route-name')?.value?.trim();
-                const dados = {
-                    nome_rota: nome || 'Nova Rota (template)',
-                    zabbix_items: itens,
-                    lat: state.mapa?.getCenter?.()?.lat() || -23.5505,
-                    lng: state.mapa?.getCenter?.()?.lng() || -46.6333
-                };
-                await api.salvarRota(dados);
-                ui.mostrarToast('Rota criada a partir do template!', 'success');
-            } else {
-                const zabbix_items = { ...(rota.zabbix_items || {}) };
-                Object.assign(zabbix_items, itens);
-                await api.atualizarRota(rota.id, { zabbix_items });
-                ui.mostrarToast('Template aplicado à rota atual!', 'success');
-            }
-            document.getElementById('aplicar-template-modal').style.display = 'none';
-            await state.carregarRotas();
-            mapa.renderizarRotas(state.rotasSalvas);
-        } catch (e) {
-            ui.mostrarToast('Erro ao aplicar template.', 'error');
-        }
-    }
 };

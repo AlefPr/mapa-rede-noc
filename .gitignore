@@ -8,3 +8,4 @@ backend/logs/
 coverage/
 docker-compose.yml
 Dockerfile
+backend/data/

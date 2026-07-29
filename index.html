@@ -29,12 +29,12 @@
     <button id="btn-sla" title="SLA · Disponibilidade" class="tb-btn"><i class="ph ph-chart-bar"></i></button>
     <button id="btn-resumo" title="Painel de Rotas" class="tb-btn"><i class="ph ph-list-magnifying-glass"></i></button>
     <button id="create-route-button" title="Criar Nova Rota" class="tb-btn tb-create"><i class="ph ph-plus-circle"></i></button>
-    <button id="btn-aplicar-template" title="Aplicar Template" class="tb-btn"><i class="ph ph-bookmark-simple"></i></button>
     <button id="quick-delete-button" title="Modo Exclusão Rápida" class="tb-btn"><i class="ph ph-trash"></i></button>
     <button id="open-inventory-button" title="Inventário de Rede" class="tb-btn"><i class="ph ph-hard-drives"></i></button>
     <label title="Alternar Tema" class="tb-btn"><input type="checkbox" id="dark-mode-checkbox" checked style="display:none;"><i class="ph ph-moon"></i></label>
     <div class="tb-sep"></div>
     <a href="/flow/" title="Flow Analysis" class="tb-btn" style="color:#38bdf8;text-decoration:none;display:flex;align-items:center;justify-content:center;"><i class="ph ph-graph"></i></a>
+    <a href="/" title="Launcher" class="tb-btn" style="color:#94a3b8;text-decoration:none;display:flex;align-items:center;justify-content:center;"><i class="ph ph-house"></i></a>
     <label title="Ímã de Ruas" class="tb-btn"><input type="checkbox" id="snap-to-road-checkbox" style="display:none;"><i class="ph ph-magnet"></i></label>
     <button id="btn-login" title="Autenticação" class="tb-btn" style="color:#60a5fa;"><i class="ph ph-user-circle"></i></button>
     <button id="btn-logout" title="Sair" class="tb-btn" style="color:#ef4444;display:none;"><i class="ph ph-sign-out"></i></button>
@@ -386,7 +386,6 @@
 
         <div class="drawer-footer">
             <button id="delete-route-button" class="btn-danger" style="display: none;"><i class="ph ph-trash"></i> Excluir</button>
-            <button id="btn-salvar-template" class="btn-secondary" style="display:none;margin-left:8px;" title="Salvar configuração Zabbix como template"><i class="ph ph-bookmark-simple"></i></button>
             <div class="right-buttons" style="display: flex; gap: 10px; margin-left: auto;">
                 <button id="modal-cancel-button" class="btn-secondary">Cancelar (Esc)</button>
                 <button id="modal-save-button" class="btn-primary">Salvar Rota (Ctrl+Enter)</button>
@@ -536,49 +535,6 @@
             <div id="command-palette-results" style="max-height: 350px; overflow-y: auto; padding: 10px 0;"></div>
         </div>
     </div>
-<div id="template-modal" class="modal-overlay" style="backdrop-filter: blur(4px);">
-    <div class="modal-content premium-modal" style="width: 500px; max-width: 90vw;">
-        <div class="modal-header" style="padding:18px 22px;border-bottom:1px solid #27272a;display:flex;justify-content:space-between;align-items:center;">
-            <h2 style="margin:0;display:flex;align-items:center;gap:8px;color:#f4f4f5;font-size:16px;"><i class="ph ph-bookmark-simple" style="color:#8b5cf6;"></i> <span id="template-modal-title">Salvar como Template</span></h2>
-            <button id="fechar-template-modal" class="btn-secondary" style="padding:4px 8px;margin:0;"><i class="ph ph-x"></i></button>
-        </div>
-        <div class="modal-body" style="padding:20px;">
-            <div style="margin-bottom:14px;">
-                <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px;">Nome do Template</label>
-                <input id="template-nome" type="text" placeholder="Ex: Cliente 100Mbps" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;outline:none;box-sizing:border-box;">
-            </div>
-            <div style="margin-bottom:14px;">
-                <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px;">Descrição</label>
-                <textarea id="template-descricao" placeholder="Opcional" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;outline:none;box-sizing:border-box;resize:vertical;min-height:60px;font-family:inherit;"></textarea>
-            </div>
-            <div style="margin-bottom:14px;">
-                <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px;">Itens Zabbix a incluir</label>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-in" checked> IN</label>
-                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-out" checked> OUT</label>
-                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-rx" checked> RX</label>
-                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-status" checked> Status</label>
-                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-latency" checked> Latência</label>
-                    <label style="font-size:12px;color:#cbd5e1;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="tmp-inc-jitter" checked> Jitter</label>
-                </div>
-            </div>
-            <button id="btn-confirmar-template" class="btn-primary" style="width:100%;"><i class="ph ph-check"></i> Salvar Template</button>
-        </div>
-    </div>
-</div>
-
-<div id="aplicar-template-modal" class="modal-overlay" style="backdrop-filter: blur(4px);">
-    <div class="modal-content premium-modal" style="width: 500px; max-width: 90vw;">
-        <div class="modal-header" style="padding:18px 22px;border-bottom:1px solid #27272a;display:flex;justify-content:space-between;align-items:center;">
-            <h2 style="margin:0;display:flex;align-items:center;gap:8px;color:#f4f4f5;font-size:16px;"><i class="ph ph-bookmark-simple" style="color:#3b82f6;"></i> Aplicar Template</h2>
-            <button id="fechar-aplicar-template" class="btn-secondary" style="padding:4px 8px;margin:0;"><i class="ph ph-x"></i></button>
-        </div>
-        <div class="modal-body" style="padding:20px;max-height:50vh;overflow-y:auto;">
-            <div id="lista-templates"></div>
-            <div id="sem-templates" style="display:none;text-align:center;padding:30px;color:#64748b;font-size:13px;">Nenhum template salvo.</div>
-        </div>
-    </div>
-</div>
 
 <div id="login-overlay">
   <div class="lgn-container">

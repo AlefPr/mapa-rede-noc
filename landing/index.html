@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>noculys.io · autenticação</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #050B14;
+      --panel: #0A0F1A;
+      --surface: rgba(255, 255, 255, 0.03);
+      --border: rgba(148, 163, 184, 0.06);
+      --border-active: rgba(148, 163, 184, 0.15);
+      --text: #E2E8F0;
+      --text-dim: #475569;
+      --text-muted: #334155;
+      --green: #22C55E;
+      --blue: #2563EB;
+      --blue-hover: #3B82F6;
+      --red: #EF4444;
+      --font: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ══════════════════════════════════════════
+       LOGIN SCREEN
+       ══════════════════════════════════════════ */
+    #login-screen {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+    #login-screen.hidden { display: none; }
+
+    .panel-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .panel-info::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background:
+        radial-gradient(ellipse at 30% 50%, rgba(37, 99, 235, 0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 50%, rgba(34, 197, 94, 0.02) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .info-content { position: relative; z-index: 1; }
+
+    .logo-line {
+      font-size: 13px; font-weight: 500; color: var(--green);
+      margin-bottom: 48px; letter-spacing: 0.3px;
+    }
+    .logo-line::before { content: '◆ '; color: var(--blue); }
+
+    .clock-display {
+      font-size: 72px; font-weight: 700;
+      letter-spacing: -2px; line-height: 1;
+      color: var(--text); margin-bottom: 8px;
+      font-variant-numeric: tabular-nums;
+      font-family: var(--mono);
+    }
+    .date-display {
+      font-size: 15px; color: var(--text-dim);
+      margin-bottom: 48px; font-weight: 400;
+    }
+
+    .status-grid { display: flex; gap: 32px; }
+    .status-item { display: flex; flex-direction: column; gap: 6px; }
+    .status-label {
+      font-size: 11px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .status-value {
+      font-size: 14px; font-weight: 500;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+    }
+    .status-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-dot.offline { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+    .terminal-line {
+      font-size: 12px; color: var(--text-dim);
+      margin-top: 48px; padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; gap: 4px 16px;
+    }
+    .terminal-line span { color: var(--text-muted); }
+    .terminal-line .prompt { color: var(--green); }
+    .terminal-line .cmd { color: var(--text); }
+
+    .log-container {
+      margin-top: 32px; max-height: 120px;
+      overflow: hidden; position: relative;
+    }
+    .log-container::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 40px;
+      background: linear-gradient(transparent, var(--bg));
+      pointer-events: none;
+    }
+    .log-line {
+      font-size: 11px; color: var(--text-dim);
+      padding: 2px 0; white-space: nowrap;
+      opacity: 0; animation: logFadeIn 0.3s ease forwards;
+    }
+    @keyframes logFadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .log-line .ts { color: var(--text-muted); }
+    .log-line .info { color: var(--green); }
+
+    .panel-auth {
+      width: 420px; min-width: 420px;
+      display: flex; flex-direction: column;
+      justify-content: center;
+      padding: 64px 48px;
+    }
+    .auth-header { margin-bottom: 48px; }
+    .auth-title {
+      font-size: 13px; font-weight: 500; color: var(--green);
+      text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;
+    }
+    .auth-subtitle {
+      font-size: 11px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 1.5px;
+    }
+
+    .error-line {
+      display: none; font-size: 12px; color: var(--red);
+      margin-bottom: 20px; padding: 10px 14px;
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.1);
+      border-radius: 6px;
+    }
+    .error-line.visible { display: block; }
+    .error-line::before { content: '! '; font-weight: 700; }
+
+    .form-group { margin-bottom: 20px; }
+    .input-row {
+      display: flex; align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+    .input-row:focus-within {
+      border-color: var(--border-active);
+      background: rgba(255, 255, 255, 0.04);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+    }
+    .input-prefix {
+      padding: 0 0 0 14px; font-size: 13px;
+      color: var(--text-dim); white-space: nowrap; flex-shrink: 0;
+    }
+    .input-prefix .arrow { color: var(--green); }
+    .input-row input {
+      flex: 1; background: transparent; border: none;
+      padding: 16px 14px; font-size: 14px;
+      color: var(--text); outline: none; min-width: 0;
+    }
+    .input-row input::placeholder { color: var(--text-muted); font-size: 13px; }
+    .toggle-pass {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; padding: 0 14px;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+      transition: 150ms ease; flex-shrink: 0;
+    }
+    .toggle-pass:hover { color: var(--text-dim); }
+    .field-error {
+      font-size: 11px; color: var(--red);
+      margin-top: 6px; display: none; padding-left: 2px;
+    }
+
+    .btn-auth {
+      width: 100%; margin-top: 28px; padding: 16px;
+      background: var(--blue); border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      color: var(--text); cursor: pointer;
+      transition: background 150ms ease;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      text-transform: uppercase; letter-spacing: 1.5px;
+    }
+    .btn-auth:hover { background: var(--blue-hover); }
+    .btn-auth:active { transform: scale(0.98); }
+    .btn-auth:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .btn-auth .spinner {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: var(--text);
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    .btn-auth.loading .spinner { display: inline-block; }
+    .btn-auth.loading .btn-label { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .auth-footer {
+      margin-top: 40px;
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px;
+    }
+
+    @media (max-width: 900px) {
+      .panel-info { display: none; }
+      .panel-auth { width: 100%; min-width: 0; border-left: none; padding: 48px 32px; align-items: center; }
+      .auth-wrapper { width: 100%; max-width: 380px; }
+    }
+    @media (max-width: 480px) {
+      .panel-auth { padding: 32px 20px; }
+    }
+
+    /* ══════════════════════════════════════════
+        LAUNCHER (pós-login)
+        ══════════════════════════════════════════ */
+     #launcher { display: none; }
+     #launcher.visible { display: flex; height: 100vh; align-items: center; justify-content: center; }
+     #launcher, #launcher input, #launcher button { font-family: var(--font); }
+
+     /* ── Background: letra N decorativa ── */
+     #bg-n {
+       position: fixed;
+       left: -2vw;
+       top: 5vh;
+       width: 42vw;
+       height: 90vh;
+       pointer-events: none;
+       z-index: 0;
+       user-select: none;
+       filter: drop-shadow(0 0 40px rgba(71,85,105,0.08));
+     }
+     #bg-n svg {
+       width: 100%;
+       height: 100%;
+       display: block;
+     }
+
+     .t {
+       max-width: 640px;
+       width: 100%;
+       padding: 2rem;
+       position: relative;
+       z-index: 1;
+     }
+
+     .t-header {
+       display: flex;
+       justify-content: space-between;
+       font-size: 0.75rem;
+       color: var(--text-muted);
+       margin-bottom: 0.25rem;
+     }
+     .t-header strong { color: var(--text); font-weight: 500; }
+     .t-bar { border: none; border-top: 1px solid var(--border); margin-bottom: 1.25rem; }
+
+     .t-line {
+       font-size: 0.8rem;
+       color: var(--text-dim);
+       line-height: 1.9;
+       white-space: pre;
+     }
+     .t-line .label { color: var(--text-muted); }
+     .t-line .val { color: var(--text); }
+     .t-line .val.green { color: var(--green); }
+     .t-line .val.red { color: var(--red); }
+     .t-line .val.yellow { color: #facc15; }
+
+     .t-cards {
+       display: flex;
+       gap: 1rem;
+       margin: 1.25rem 0 1.5rem;
+     }
+     .t-card {
+       flex: 1;
+       display: block;
+       text-decoration: none;
+       border: 1px solid var(--border);
+       border-radius: 6px;
+       padding: 1rem 1.25rem;
+       transition: border-color 200ms ease, background 150ms ease;
+       cursor: pointer;
+     }
+     .t-card:hover {
+       border-color: rgba(148,163,184,0.25);
+       background: rgba(255,255,255,0.015);
+     }
+     .t-card-num {
+       color: var(--green);
+       font-size: 0.7rem;
+       font-family: var(--mono);
+     }
+     .t-card-title {
+       font-size: 0.85rem;
+       color: var(--text);
+       margin: 0.25rem 0 0.35rem;
+     }
+     .t-card-desc {
+       font-size: 0.7rem;
+       color: var(--text-muted);
+       line-height: 1.5;
+       margin-bottom: 0.6rem;
+     }
+     .t-card-stat {
+       font-size: 0.65rem;
+       color: var(--text-dim);
+       font-family: var(--mono);
+     }
+     .t-card-stat .ok { color: var(--green); }
+     .t-card-stat .warn { color: #facc15; }
+     .t-card-stat .erro { color: var(--red); }
+
+     .t-panel {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+      }
+     .t-panel-title {
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 0.5rem;
+        font-family: var(--mono);
+      }
+
+     .t-health {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+     .t-health-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+      }
+     .t-health-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+     .t-health-dot.ok { background: var(--green); }
+     .t-health-dot.erro { background: var(--red); }
+
+     .t-incidents {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+     .t-incidents li {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        line-height: 1.8;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+     .t-incidents .sev {
+        font-size: 0.6rem;
+        font-weight: 600;
+        padding: 0 0.35rem;
+        border-radius: 3px;
+        text-transform: uppercase;
+        font-family: var(--mono);
+      }
+     .t-incidents .sev.critical { background: rgba(239,68,68,0.15); color: var(--red); }
+     .t-incidents .sev.high { background: rgba(250,204,21,0.15); color: #facc15; }
+     .t-incidents .sev.medium { background: rgba(59,130,246,0.15); color: #3B82F6; }
+     .t-incidents .sev.low { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+     .t-incidents .none {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+     .t-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 0.5rem;
+      }
+     .t-prompt {
+        color: var(--green);
+        font-size: 0.8rem;
+      }
+     .t-cursor {
+        display: inline-block;
+        width: 0.55em;
+        height: 1em;
+        background: var(--green);
+        animation: blink 1s step-end infinite;
+        vertical-align: text-bottom;
+        margin-left: 2px;
+      }
+     @keyframes blink { 50% { opacity: 0; } }
+     .t-sair {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-family: inherit;
+        transition: color 150ms ease;
+      }
+     .t-sair:hover { color: var(--red); }
+
+     @media (max-width: 480px) {
+        .t-cards { flex-direction: column; }
+      }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ Background N ═══ -->
+  <div id="bg-n">
+    <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMinYMid meet" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="neon-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <circle r="5" fill="#22c55e" opacity="0.9" filter="url(#neon-glow)">
+        <animateMotion dur="6s" repeatCount="indefinite"
+          path="M 100 50 L 100 880 Q 100 950 170 950 L 730 50 Q 800 50 800 120 L 800 950"/>
+      </circle>
+      <path d="M 100 50 L 100 880 Q 100 950 170 950 L 730 50 Q 800 50 800 120 L 800 950"
+            fill="none" stroke="#475569" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" opacity="0.08"/>
+      <polyline points="520,220 540,200 560,215 580,180 600,195 620,160"
+                fill="none" stroke="#22c55e" stroke-width="0.6" opacity="0.05"/>
+      <line x1="510" y1="230" x2="630" y2="230" stroke="#475569" stroke-width="0.3" opacity="0.03"/>
+      <rect x="160" y="720" width="16" height="40" rx="2" fill="none" stroke="#22c55e" stroke-width="0.5" opacity="0.04"/>
+      <rect x="182" y="700" width="16" height="60" rx="2" fill="none" stroke="#2563eb" stroke-width="0.5" opacity="0.04"/>
+      <rect x="204" y="730" width="16" height="30" rx="2" fill="none" stroke="#22c55e" stroke-width="0.5" opacity="0.04"/>
+      <rect x="226" y="710" width="16" height="50" rx="2" fill="none" stroke="#22c55e" stroke-width="0.5" opacity="0.04"/>
+      <polyline points="350,400 370,400 380,380 390,420 400,370 410,430 420,400 440,400"
+                fill="none" stroke="#ef4444" stroke-width="0.7" opacity="0.05"/>
+      <circle cx="700" cy="300" r="30" fill="none" stroke="#22c55e" stroke-width="0.8" opacity="0.05"
+              stroke-dasharray="140 48" stroke-linecap="round"/>
+      <circle cx="700" cy="300" r="30" fill="none" stroke="#2563eb" stroke-width="0.8" opacity="0.04"
+              stroke-dasharray="90 98" stroke-linecap="round" transform="rotate(-120 700 300)"/>
+      <path d="M 550 700 A 50 50 0 0 1 650 700"
+            fill="none" stroke="#475569" stroke-width="0.8" opacity="0.04" stroke-linecap="round"/>
+      <line x1="600" y1="700" x2="585" y2="660" stroke="#22c55e" stroke-width="0.5" opacity="0.05" stroke-linecap="round"/>
+      <circle cx="600" cy="700" r="2" fill="#475569" opacity="0.05"/>
+      <rect x="660" y="780" width="40" height="6" rx="1" fill="none" stroke="#2563eb" stroke-width="0.4" opacity="0.04"/>
+      <rect x="660" y="790" width="40" height="6" rx="1" fill="none" stroke="#2563eb" stroke-width="0.4" opacity="0.04"/>
+      <rect x="660" y="800" width="40" height="6" rx="1" fill="none" stroke="#22c55e" stroke-width="0.4" opacity="0.04"/>
+      <rect x="660" y="810" width="40" height="6" rx="1" fill="none" stroke="#2563eb" stroke-width="0.4" opacity="0.04"/>
+      <rect x="660" y="820" width="40" height="6" rx="1" fill="none" stroke="#2563eb" stroke-width="0.4" opacity="0.04"/>
+      <g fill="#475569" opacity="0.03">
+        <circle cx="300" cy="200" r="1.5"/><circle cx="320" cy="200" r="1.5"/>
+        <circle cx="340" cy="200" r="1.5"/><circle cx="360" cy="200" r="1.5"/>
+        <circle cx="300" cy="220" r="1.5"/><circle cx="320" cy="220" r="1.5"/>
+        <circle cx="340" cy="220" r="1.5"/><circle cx="360" cy="220" r="1.5"/>
+        <circle cx="300" cy="240" r="1.5"/><circle cx="320" cy="240" r="1.5"/>
+        <circle cx="340" cy="240" r="1.5"/><circle cx="360" cy="240" r="1.5"/>
+        <circle cx="500" cy="550" r="1.2"/><circle cx="515" cy="550" r="1.2"/>
+        <circle cx="530" cy="550" r="1.2"/><circle cx="545" cy="550" r="1.2"/>
+        <circle cx="500" cy="565" r="1.2"/><circle cx="515" cy="565" r="1.2"/>
+        <circle cx="530" cy="565" r="1.2"/><circle cx="545" cy="565" r="1.2"/>
+      </g>
+      <g stroke="#475569" stroke-width="0.3" opacity="0.03" fill="none">
+        <line x1="280" y1="350" x2="350" y2="300"/>
+        <line x1="350" y1="300" x2="420" y2="330"/>
+        <line x1="420" y1="330" x2="380" y2="400"/>
+        <line x1="200" y1="650" x2="300" y2="650"/>
+        <line x1="300" y1="650" x2="350" y2="700"/>
+        <line x1="450" y1="800" x2="550" y2="780"/>
+        <line x1="550" y1="780" x2="650" y2="800"/>
+        <circle cx="280" cy="350" r="2" fill="#22c55e" opacity="0.04"/>
+        <circle cx="350" cy="300" r="2" fill="#2563eb" opacity="0.04"/>
+        <circle cx="420" cy="330" r="2" fill="#475569" opacity="0.04"/>
+        <circle cx="200" cy="650" r="2" fill="#22c55e" opacity="0.04"/>
+        <circle cx="300" cy="650" r="2" fill="#475569" opacity="0.04"/>
+        <circle cx="350" cy="700" r="2" fill="#2563eb" opacity="0.04"/>
+        <circle cx="550" cy="780" r="2" fill="#22c55e" opacity="0.04"/>
+      </g>
+      <g stroke="#475569" stroke-width="0.3" opacity="0.03">
+        <line x1="95" y1="100" x2="105" y2="100"/>
+        <line x1="97" y1="150" x2="103" y2="150"/>
+        <line x1="95" y1="200" x2="105" y2="200"/>
+        <line x1="97" y1="250" x2="103" y2="250"/>
+        <line x1="95" y1="300" x2="105" y2="300"/>
+        <line x1="97" y1="350" x2="103" y2="350"/>
+        <line x1="95" y1="400" x2="105" y2="400"/>
+      </g>
+      <polyline points="720,850 735,840 750,855 765,830 780,845"
+                fill="none" stroke="#2563eb" stroke-width="0.5" opacity="0.04"/>
+      <polyline points="720,860 735,870 750,855 765,865 780,850"
+                fill="none" stroke="#22c55e" stroke-width="0.5" opacity="0.04"/>
+    </svg>
+  </div>
+
+  <!-- ═══ LOGIN SCREEN ═══ -->
+  <div id="login-screen">
+    <section class="panel-info">
+      <div class="info-content">
+        <div class="logo-line">noculys.io  ·  v2.0.1</div>
+        <div class="clock-display" id="clock">--:--:--</div>
+        <div class="date-display" id="date">---</div>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="status-label">API</span>
+            <span class="status-value"><span class="status-dot offline" id="s-api"></span><span id="sl-api">Verificando</span></span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Base de Dados</span>
+            <span class="status-value"><span class="status-dot offline" id="s-db"></span><span id="sl-db">---</span></span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Redis</span>
+            <span class="status-value"><span class="status-dot offline" id="s-redis"></span><span id="sl-redis">---</span></span>
+          </div>
+        </div>
+        <div class="terminal-line">
+          <span><span class="prompt">noculys</span>@<span class="cmd">last login</span></span>
+          <span id="last-login">---</span>
+        </div>
+        <div class="log-container">
+          <div class="log-scroll" id="log-scroll"></div>
+        </div>
+      </div>
+    </section>
+    <section class="panel-auth">
+      <div class="auth-wrapper">
+        <div class="auth-header">
+          <div class="auth-title">> noculys.io login</div>
+          <div class="auth-subtitle">digite as credenciais de acesso</div>
+        </div>
+        <div class="error-line" id="error-line"></div>
+        <div id="login-form">
+          <div class="form-group">
+            <div class="input-row">
+              <span class="input-prefix"><span class="arrow">&gt;</span> user</span>
+              <input type="text" id="username" placeholder="utilizador" autocomplete="username" spellcheck="false">
+            </div>
+            <div class="field-error" id="username-error">campo obrigatório</div>
+          </div>
+          <div class="form-group">
+            <div class="input-row">
+              <span class="input-prefix"><span class="arrow">&gt;</span> pass</span>
+              <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+              <button type="button" class="toggle-pass" id="toggle-pass">ver</button>
+            </div>
+            <div class="field-error" id="password-error">campo obrigatório</div>
+          </div>
+          <button type="button" class="btn-auth" id="btn-login">
+            <span class="btn-label">Autenticar</span>
+            <span class="spinner"></span>
+          </button>
+        </div>
+        <div class="auth-footer">
+          <span>noculys.io</span>
+          <span>v2.0.1 · 2026</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══ LAUNCHER ═══ -->
+  <div id="launcher">
+    <div class="t">
+
+      <div class="t-header">
+        <span>noculys.io  ·  v2.0.1</span>
+        <span><strong id="t-user">—</strong>@noculys</span>
+      </div>
+      <hr class="t-bar">
+
+      <div class="t-line"><span class="label">  status  :</span> <span id="t-status" class="val">—</span></div>
+      <div class="t-line"><span class="label">  traffic :</span> <span id="t-traffic" class="val">—</span></div>
+      <div class="t-line"><span class="label">  alarms  :</span> <span id="t-alarms" class="val">—</span></div>
+
+      <div class="t-line" style="margin-bottom:0.5rem;"><span class="label">── módulos ──</span></div>
+
+      <div class="t-cards">
+
+        <a href="/mapa/" class="t-card">
+          <div class="t-card-num">[01]</div>
+          <div class="t-card-title">Mapa de Rede</div>
+          <div class="t-card-desc">Visualização interativa, rotas, SLA, telemetria e incidentes</div>
+          <div class="t-card-stat" id="stat-mapa">—</div>
+        </a>
+
+        <a href="/flow/" class="t-card">
+          <div class="t-card-num">[02]</div>
+          <div class="t-card-title">Flow Analysis</div>
+          <div class="t-card-desc">NetFlow/sFlow com dashboards, top talkers e deteção de ataques</div>
+          <div class="t-card-stat" id="stat-flow">—</div>
+        </a>
+
+      </div>
+
+      <div class="t-panel">
+        <div class="t-panel-title"># saúde</div>
+        <div class="t-health">
+          <div class="t-health-item"><span class="t-health-dot" id="th-api"></span> API</div>
+          <div class="t-health-item"><span class="t-health-dot" id="th-db"></span> MySQL</div>
+          <div class="t-health-item"><span class="t-health-dot" id="th-redis"></span> Redis</div>
+          <div class="t-health-item"><span class="t-health-dot" id="th-nfacctd"></span> nfacctd</div>
+        </div>
+      </div>
+
+      <div class="t-panel">
+        <div class="t-panel-title"># incidentes</div>
+        <ul class="t-incidents" id="t-inc-list">
+          <li class="none">a carregar…</li>
+        </ul>
+      </div>
+
+      <div class="t-footer">
+        <div>
+          <span class="t-prompt">$</span>
+          <span id="t-cmd" style="font-size:0.8rem;color:var(--text-dim);margin-left:0.5rem;">_</span>
+          <span class="t-cursor"></span>
+        </div>
+        <button class="t-sair" id="btn-logout">sair</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const API = window.location.origin;
+      const $ = id => document.getElementById(id);
+
+      function fmtBps(v) {
+        if (!v || v === 0) return '0 bps';
+        if (v >= 1e9) return (v / 1e9).toFixed(2) + ' Gbps';
+        if (v >= 1e6) return (v / 1e6).toFixed(1) + ' Mbps';
+        if (v >= 1e3) return (v / 1e3).toFixed(0) + ' Kbps';
+        return Math.round(v) + ' bps';
+      }
+
+      // ── CLOCK & LOGS ──
+      function updateClock() {
+        const now = new Date();
+        $('clock').textContent =
+          String(now.getHours()).padStart(2, '0') + ':' +
+          String(now.getMinutes()).padStart(2, '0') + ':' +
+          String(now.getSeconds()).padStart(2, '0');
+        $('date').textContent =
+          now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      }
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      const LOGS = [
+        { tag: 'ok', service: 'system', msg: 'NOC daemon started' },
+        { tag: 'ok', service: 'mysql', msg: 'connection pool ready' },
+        { tag: 'ok', service: 'redis', msg: 'connected to 127.0.0.1:6379' },
+        { tag: 'ok', service: 'zabbix', msg: 'cache sync completed · 43 items' },
+        { tag: 'ok', service: 'socket.io', msg: 'listening on port 3000' },
+        { tag: 'ok', service: 'system', msg: 'monitoring daemon started' },
+        { tag: 'ok', service: 'mysql', msg: 'connection pool ready' },
+        { tag: 'ok', service: 'redis', msg: 'connected to 127.0.0.1:6379' },
+        { tag: 'ok', service: 'zabbix', msg: 'cache sync completed · 43 items' },
+        { tag: 'ok', service: 'socket.io', msg: 'listening on port 3000' },
+        { tag: 'ok', service: 'nfacctd', msg: 'NetFlow collector active on 2055' },
+        { tag: 'ok', service: 'flow', msg: 'aggregation engine running' },
+      ];
+      const logScroll = $('log-scroll');
+      let logIdx = 0;
+      function addLog() {
+        if (logIdx >= LOGS.length) return;
+        const e = LOGS[logIdx++];
+        const div = document.createElement('div');
+        div.className = 'log-line';
+        div.innerHTML = '<span class="ts">[' + e.tag + ']</span> <span class="info">' + e.service + '</span> ' + e.msg;
+        logScroll.appendChild(div);
+      }
+      for (let i = 0; i < 4; i++) addLog();
+      setInterval(() => { addLog(); }, 500);
+
+      // ── HEALTH ──
+      function setStatus(dotId, labelId, ok) {
+        const dot = $(dotId), label = $(labelId);
+        if (!dot || !label) return;
+        dot.className = 'status-dot ' + (ok ? 'online' : 'offline');
+        label.textContent = ok ? 'Online' : 'Offline';
+      }
+      async function checkHealth() {
+        try {
+          const res = await fetch(API + '/mapa/health');
+          if (res.ok) {
+            const data = await res.json();
+            setStatus('s-api', 'sl-api', true);
+            setStatus('s-db', 'sl-db', data.mariadb === true);
+            setStatus('s-redis', 'sl-redis', data.redis === true);
+          } else {
+            setStatus('s-api', 'sl-api', false);
+            setStatus('s-db', 'sl-db', false);
+            setStatus('s-redis', 'sl-redis', false);
+          }
+        } catch {
+          setStatus('s-api', 'sl-api', false);
+          setStatus('s-db', 'sl-db', false);
+          setStatus('s-redis', 'sl-redis', false);
+        }
+      }
+      checkHealth();
+      setInterval(checkHealth, 10000);
+
+      const lastLogin = localStorage.getItem('noc_last_login');
+      $('last-login').textContent = lastLogin || 'Nunca  ·  primeiro acesso';
+
+      // ── LOGIN ──
+      async function fazerLogin() {
+        const username = $('username').value.trim();
+        const password = $('password').value;
+        $('username-error').style.display = 'none';
+        $('password-error').style.display = 'none';
+        $('error-line').classList.remove('visible');
+        let valid = true;
+        if (!username) { $('username-error').textContent = 'insira o username'; $('username-error').style.display = 'block'; valid = false; }
+        if (!password) { $('password-error').textContent = 'insira a password'; $('password-error').style.display = 'block'; valid = false; }
+        if (!valid) return;
+        const btn = $('btn-login');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        try {
+          const res = await fetch(API + '/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ username, password })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'credenciais inválidas');
+          localStorage.setItem('noc_last_login', new Date().toLocaleString('pt-BR'));
+          localStorage.setItem('noc_user', username);
+          $('login-screen').classList.add('hidden');
+          $('launcher').classList.add('visible');
+          carregarStatus();
+        } catch (err) {
+          $('error-line').textContent = err.message;
+          $('error-line').classList.add('visible');
+        }
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+
+      $('btn-login').addEventListener('click', fazerLogin);
+      $('username').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin(); });
+      $('password').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin(); });
+      $('toggle-pass').addEventListener('click', () => {
+        const input = $('password');
+        const hidden = input.getAttribute('type') === 'password';
+        input.setAttribute('type', hidden ? 'text' : 'password');
+        $('toggle-pass').textContent = hidden ? 'ocultar' : 'ver';
+      });
+      $('username').addEventListener('input', () => { $('username-error').style.display = 'none'; $('error-line').classList.remove('visible'); });
+      $('password').addEventListener('input', () => { $('password-error').style.display = 'none'; $('error-line').classList.remove('visible'); });
+
+      // ── LAUNCHER STATUS ──
+      async function carregarStatus() {
+        const ts = $('t-status'), tt = $('t-traffic'), ta = $('t-alarms'), tu = $('t-user');
+        const sm = $('stat-mapa'), sf = $('stat-flow');
+        const tInc = $('t-inc-list');
+        try {
+          const [rotas, problemas, flow, health] = await Promise.all([
+            fetch(API + '/api/rotas', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+            fetch(API + '/api/problemas', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+            fetch(API + '/api/flow/resumo?periodo=1h', { credentials: 'include' }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch(API + '/mapa/health').then(r => r.ok ? r.json() : null).catch(() => null)
+          ]);
+
+          const total = Array.isArray(rotas) ? rotas.length : 0;
+          let up = 0, down = 0;
+          if (Array.isArray(rotas)) {
+            for (const r of rotas) {
+              const st = (r.status || '').toLowerCase();
+              if (st === 'up' || st === 'ok' || st === 'online') up++;
+              else if (st === 'down' || st === 'offline' || st === 'critical') down++;
+            }
+          }
+          const ativos = Array.isArray(problemas) ? problemas.filter(p =>
+            !['resolvido', 'fechado', 'ok'].includes((p.status || '').toLowerCase())
+          ).length : '—';
+
+          if (ts) {
+            const cls = down > 0 ? 'yellow' : 'green';
+            ts.className = 'val ' + cls;
+            ts.textContent = total + ' rotas · ' + up + ' UP' + (down > 0 ? ' · ' + down + ' DOWN' : '');
+          }
+          if (tt && flow) {
+            tt.textContent = '▲ ' + fmtBps(flow.in_bps) + '  ▼ ' + fmtBps(flow.out_bps);
+          } else if (tt) {
+            tt.textContent = 'sem dados';
+          }
+          if (ta) {
+            const cls = ativos > 0 ? 'red' : 'green';
+            ta.className = 'val ' + cls;
+            ta.textContent = ativos > 0 ? ativos + ' incidentes ativos' : 'nenhum';
+          }
+          if (tu) {
+            tu.textContent = localStorage.getItem('noc_user') || 'operador';
+          }
+          if (sm) {
+            const pct = total > 0 ? Math.round(up / total * 100) : 0;
+            const cls = down > 0 ? 'warn' : 'ok';
+            sm.innerHTML = total + ' rotas · <span class="' + cls + '">' + up + ' UP (' + pct + '%)</span>';
+          }
+          if (sf && flow) {
+            sf.innerHTML = '▼ ' + fmtBps(flow.out_bps) + '  ▲ <span class="ok">' + fmtBps(flow.in_bps) + '</span>';
+          } else if (sf) {
+            sf.textContent = '—';
+          }
+
+          // Health
+          if (health) {
+            setDot('th-api', true);
+            setDot('th-db', health.mariadb === true);
+            setDot('th-redis', health.redis === true);
+            setDot('th-nfacctd', health.nfacctd === true);
+          } else {
+            ['th-api','th-db','th-redis','th-nfacctd'].forEach(id => setDot(id, false));
+          }
+
+          // Incidents
+          if (tInc) {
+            const ativosArr = Array.isArray(problemas) ? problemas.filter(p =>
+              !['resolvido', 'fechado', 'ok'].includes((p.status || '').toLowerCase())
+            ) : [];
+            if (ativosArr.length === 0) {
+              tInc.innerHTML = '<li class="none">nenhum incidente ativo</li>';
+            } else {
+              tInc.innerHTML = ativosArr.slice(0, 5).map(p => {
+                const sev = (p.severidade || p.severity || 'low').toLowerCase();
+                return '<li><span class="sev ' + sev + '">' + sev + '</span> ' + esc(p.titulo || p.nome || p.title || '—') + '</li>';
+              }).join('');
+            }
+          }
+        } catch (e) {
+          if (ts) { ts.textContent = 'erro ao carregar'; ts.className = 'val red'; }
+          if (tt) tt.textContent = '—';
+          if (ta) { ta.textContent = '—'; ta.className = 'val'; }
+          if (sm) sm.textContent = '—';
+          if (sf) sf.textContent = '—';
+        }
+      }
+      function setDot(id, ok) {
+        const el = $(id);
+        if (el) el.className = 't-health-dot ' + (ok ? 'ok' : 'erro');
+      }
+      function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      // ── LOGOUT ──
+      $('btn-logout').addEventListener('click', async () => {
+        await fetch(API + '/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+        $('launcher').classList.remove('visible');
+        $('login-screen').classList.remove('hidden');
+        $('username').value = '';
+        $('password').value = '';
+        $('error-line').classList.remove('visible');
+        $('username-error').style.display = 'none';
+        $('password-error').style.display = 'none';
+        $('last-login').textContent = localStorage.getItem('noc_last_login') || 'Nunca  ·  primeiro acesso';
+      });
+
+      // ══════════════════════════════════════════
+      // BOOT
+      // ══════════════════════════════════════════
+      (async function boot() {
+        try {
+          const res = await fetch(API + '/api/auth/verificar', { credentials: 'include' });
+          const data = await res.json();
+          if (data.valido) {
+            $('login-screen').classList.add('hidden');
+            $('launcher').classList.add('visible');
+            carregarStatus();
+          }
+        } catch {
+          $('login-screen').classList.remove('hidden');
+        }
+      })();
+
+    })();
+  </script>
+
+</body>
+</html>
