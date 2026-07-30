@@ -23,8 +23,21 @@ exports.listarRotas = async (req, res) => {
             }
         });
 
+    let zabbixCache = {};
+    try { zabbixCache = await zabbixService.getCache(); } catch {}
+
     rotas.forEach(rota => {
         rota.zabbix_items = itemsByRota[rota.id] || { in: [], out: [], status: [], rx: [] };
+        let estaDown = false, temManutencao = !!rota.manutencao_ativa;
+        if (rota.zabbix_items.status.length > 0 && !temManutencao) {
+            for (const statusId of rota.zabbix_items.status) {
+                const item = zabbixCache[statusId];
+                if (item && (item.current == 2 || item.current == '2')) {
+                    estaDown = true; break;
+                }
+            }
+        }
+        rota.status = temManutencao ? 'manutencao' : (estaDown ? 'down' : 'up');
     });
 
     res.json(rotas);
