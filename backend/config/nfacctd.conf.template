@@ -1,37 +1,37 @@
 # ============================================
 # nfacctd.conf — pmacct 1.7.8 (NetFlow/IPFIX collector)
-# MULTI-DISPOSITIVO: um agente (instância) por equipamento
+# MULTI-DISPOSITIVO: identifica o exportador via pre_tag_map
 #
-# O pmacct 1.7.x NÃO suporta nfacctd_agents_file (é v12+).
-# Para identificar cada roteador/equipamento, rode UMA instância
-# do nfacctd por exportador, cada uma numa porta UDP própria,
-# com agent_id distinto. Todas gravam no MESMO banco flow_data.
+# O pmacct 1.7.x NÃO suporta nfacctd_agents_file (é v12+) nem a
+# diretiva 'agent_id' no nfacctd (é de pmacctd/sfacctd e quebra o
+# daemon). O jeito correto de estampar a origem dos fluxos:
 #
-#   +------------------+    +------------------+
-#   | CORE-01 (porta 2055)  | BORDER-MAIN (porta 2056)  |
-#   | agent_id: 1      |    | agent_id: 2      |
-#   +------------------+    +------------------+
+#   1) no aggregate, use o pseudo-primitivo 'tag';
+#   2) defina pre_tag_map apontando para um arquivo que mapeia o
+#      IP de origem dos pacotes NetFlow/IPFIX -> set_tag;
+#   3) o pmacct grava o valor de 'tag' na coluna 'agent_id' do SQL
+#      (tabelas padrão com sql_table_version < 9), que casa com
+#      flow_data.equipamentos.agent_id.
 #
-# Fluxo: os roteadores enviam NetFlow/IPFIX para portas diferentes
-# desta mesma máquina. O agent_id é gravado no flow_bruto/flow_minuto
-# e casa com a coluna agent_id da tabela flow_data.equipamentos.
+# Exemplo de /etc/pmacct/pretag.map (uma regra por exportador):
 #
-# Copie este arquivo para cada instância e ajuste:
-#   nfacctd_port, pidfile, logfile, agent_id
-# Exemplo de /etc/init.d/nfacctd-1.conf e nfacctd-2.conf
+#   set_tag=1 ip=192.168.254.1     ! Borda-Principal
+#   set_tag=2 ip=192.168.254.2     ! Core-02
+#
+# Recarregue o mapa sem reiniciar: killall -USR2 nfacctd
 # ============================================
 daemonize: true
-pidfile: /var/run/nfacctd-1.pid
-logfile: /var/log/pmacct/nfacctd-1.log
+pidfile: /var/run/nfacctd.pid
+logfile: /var/log/pmacct/nfacctd.log
 
 nfacctd_port: 2055
 nfacctd_ip: 0.0.0.0
 
-# ID desta instância (deve bater com flow_data.equipamentos.agent_id)
-agent_id: 1
+# Mapa exportador (IP de origem) -> tag (vira agent_id no SQL)
+pre_tag_map: /etc/pmacct/pretag.map
 
-# agent_id identifica o equipamento de origem do fluxo
-aggregate: src_host, dst_host, src_port, dst_port, proto, agent_id
+# 'tag' identifica o equipamento de origem do fluxo
+aggregate: src_host, dst_host, src_port, dst_port, proto, tag
 
 plugins: mysql
 

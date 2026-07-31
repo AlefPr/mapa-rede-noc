@@ -1,0 +1,13 @@
+# ============================================
+# pretag.map — Mapa exportador -> tag (= coluna agent_id no SQL)
+# Copie para /etc/pmacct/pretag.map e ajuste os IPs dos exportadores.
+# nfacctd: 'ip' é comparado com o IP de origem dos pacotes NetFlow/IPFIX.
+# A primeira regra que casar vence (ordem importa).
+# Recarregue sem reiniciar o daemon: killall -USR2 nfacctd
+# ============================================
+!
+! Borda-Principal (agent_id=1)
+set_tag=1 ip=192.168.254.1
+!
+! Exemplo: Core-02 (agent_id=2)
+! set_tag=2 ip=192.168.254.2

@@ -1,15 +1,19 @@
 # ============================================
-# nfacctd_agents.txt — Mapa de equipamentos -> agent_id
-# (DOCUMENTAL — o pmacct 1.7.x usa uma instância por agente)
+# nfacctd_agents.txt — Mapa de equipamentos -> tag/agent_id
+# (DOCUMENTAL — o pmacct 1.7.x usa pre_tag_map, não nfacctd_agents_file)
 #
-# No pmacct 1.7.8 o agent_id vem da diretiva `agent_id` de cada
-# instância do nfacctd, NÃO deste arquivo (nfacctd_agents_file é v12+).
+# No pmacct 1.7.8 o identificador do exportador vem do pre_tag_map
+# (neste diretório, nfacctd.conf.template explica o mecanismo):
+# o 'set_tag' vira a coluna 'agent_id' do flow_data via SQL.
 #
-# Mapa de referência do agendamento (IP do exportador -> instância):
-#   Exportador             Porta UDP   Instância   agent_id
+# Mapa de referência (IP do exportador -> tag = agent_id):
+#   Exportador             Porta UDP   tag/agent_id
 #   ------------------------------------------------------------------
-#   192.168.254.1 (core)   2055        nfacctd-1   1  -> CORE-01
-#   192.168.254.2 (border) 2056        nfacctd-2   2  -> BORDER-MAIN
-#   10.0.0.3      (cliente) 2057       nfacctd-3   3  -> CLIENTE-XXX
+#   192.168.254.1 (border) 2055        1  -> Borda-Principal
+#   192.168.254.2 (core)   2055        2  -> Core-02
 #
-# O agent_id precisa bater com a tabela flow_data.equipamentos.agent_id
+# O valor precisa bater com a tabela flow_data.equipamentos.agent_id.
+# Regras equivalentes no /etc/pmacct/pretag.map:
+#
+#   set_tag=1 ip=192.168.254.1
+#   set_tag=2 ip=192.168.254.2
