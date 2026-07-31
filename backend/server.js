@@ -118,6 +118,7 @@ app.get('/mapa/health', async (req, res) => {
   res.json(health);
 });
 
+app.get('/mapa/login.html', (req, res) => res.redirect('/'));
 app.use('/mapa', express.static(FRONTEND_DIR));
 app.use('/flow', express.static(FLOW_DIR));
 
