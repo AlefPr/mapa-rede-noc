@@ -217,6 +217,9 @@ require('./routes/historico')(app);
 require('./routes/templates')(app);
 require('./routes/problemas')(app, io);
 require('./routes/flow')(app, io);
+require('./routes/equipamentos')(app, io);
+require('./routes/clientes')(app);
+require('./routes/dashboards')(app);
 require('./routes/swagger')(app);
 
 // Middleware de erros (deve ser o último)

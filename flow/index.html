@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/phosphor-icons@1.4.2/src/css/icons.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts/dist/apexcharts.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,6 +20,14 @@
         <div class="tb-search">
           <i class="ph ph-magnifying-glass"></i>
           <input type="text" id="tb-search-input" placeholder="Buscar IP..." spellcheck="false">
+        </div>
+        <div class="tb-eq">
+          <i class="ph ph-cpu"></i>
+          <select id="tb-eq-select" title="Filtrar por equipamento"><option value="">Todos os equipamentos</option></select>
+        </div>
+        <div class="tb-eq">
+          <i class="ph ph-users"></i>
+          <select id="tb-cliente-select" title="Filtrar por cliente"><option value="">Todos os clientes</option></select>
         </div>
       </div>
       <div class="tb-right">
@@ -66,6 +75,13 @@
           <button class="sb-btn" data-view="matriz" title="Matriz ASN">
             <i class="ph ph-graph"></i>
           </button>
+          <div class="sb-divider"></div>
+          <button class="sb-btn" data-view="equipamentos" title="Equipamentos">
+            <i class="ph ph-cpu"></i>
+          </button>
+          <button class="sb-btn" data-view="clientes" title="Clientes">
+            <i class="ph ph-users"></i>
+          </button>
         </nav>
       </aside>
 
@@ -85,6 +101,8 @@
               <button class="per-btn" data-period="7d">7d</button>
             </div>
             <button class="ph-btn" id="ph-refresh" title="Atualizar"><i class="ph ph-arrows-clockwise"></i></button>
+            <button class="ph-btn" id="ph-dash" title="Dashboards"><i class="ph ph-layout"></i></button>
+            <button class="ph-btn" id="ph-customize" title="Personalizar dashboard"><i class="ph ph-sliders"></i></button>
             <button class="ph-btn" id="ph-fullscreen" title="Tela cheia"><i class="ph ph-arrows-out"></i></button>
             <span class="ph-update" id="last-update">--</span>
           </div>
@@ -92,8 +110,22 @@
 
         <!-- Dashboard -->
         <div id="view-visao-geral" class="view active">
-          <div class="dash-grid">
-            <div class="card card-chart">
+          <div class="dash-toolbar" id="dash-palette" style="display:none;gap:8px;align-items:center;margin-bottom:12px;">
+            <span style="font-size:11px;color:var(--text-muted);">Adicionar widget:</span>
+            <button class="eq-btn" data-widget="chart">Tráfego</button>
+            <button class="eq-btn" data-widget="kpis">KPIs</button>
+            <button class="eq-btn" data-widget="metricas">Capacidade</button>
+            <button class="eq-btn" data-widget="protocolos">Protocolos</button>
+            <button class="eq-btn" data-widget="live">Flows ao vivo</button>
+            <button class="eq-btn" data-widget="talkers">Top Talkers</button>
+            <button class="eq-btn" data-widget="ataques">Ataques</button>
+            <button class="eq-btn" data-widget="semanal">Comparativo Semanal</button>
+            <span style="flex:1;"></span>
+            <button class="eq-btn" id="dash-cancel-edit" style="color:#f87171;">Cancelar</button>
+            <button class="eq-btn" id="dash-save" style="border-color:var(--accent);color:var(--accent);font-weight:600;">Salvar layout</button>
+          </div>
+          <div class="dash-grid" id="dash-grid">
+            <div class="card card-chart" data-card="tráfego">
               <div class="card-head">
                 <span class="card-title">Tráfego</span>
                 <span class="card-sub" style="font-size:10px;color:var(--text-muted);margin-left:8px;font-weight:400;">apenas externo</span>
@@ -103,7 +135,7 @@
               </div>
               <div id="vg-chart"></div>
             </div>
-            <div class="card card-kpis">
+            <div class="card card-kpis" data-card="visão geral">
               <div class="card-head">
                 <span class="card-title">Visão Geral</span>
                 <div class="card-actions">
@@ -113,7 +145,7 @@
               </div>
               <div id="vg-kpis" class="mini-kpis"></div>
             </div>
-            <div class="card card-metricas">
+            <div class="card card-metricas" data-card="capacidade">
               <div class="card-head">
                 <span class="card-title">Capacidade</span>
                 <div class="card-actions">
@@ -122,7 +154,7 @@
               </div>
               <div id="vg-metricas" style="padding:4px 0;"></div>
             </div>
-            <div class="card card-protocolos">
+            <div class="card card-protocolos" data-card="protocolos">
               <div class="card-head">
                 <span class="card-title">Protocolos</span>
                 <div class="card-actions">
@@ -138,7 +170,7 @@
               <div id="vg-protocolos-footer" style="padding:6px 12px 8px;font-size:10px;color:var(--text-dim);border-top:1px solid var(--border);"></div>
             </div>
             <div class="live-feed-wrap">
-              <div class="card" id="live-feed-card">
+              <div class="card" id="live-feed-card" data-card="flows ao vivo">
                 <div class="card-head">
                   <span class="card-title">Flows ao Vivo</span>
                   <div class="card-actions">
@@ -151,7 +183,7 @@
                 </div>
               </div>
             </div>
-            <div class="card card-talkers">
+            <div class="card card-talkers" data-card="top talkers">
               <div class="card-head">
                 <span class="card-title">Top Talkers</span>
                 <div class="card-actions">
@@ -161,7 +193,7 @@
               </div>
               <div id="vg-talkers" class="vg-table-body"></div>
             </div>
-            <div class="card card-ataques">
+            <div class="card card-ataques" data-card="ataques">
               <div class="card-head">
                 <span class="card-title">Ataques</span>
                 <div class="card-actions">
@@ -172,7 +204,7 @@
               <div id="vg-banner" class="vg-banner hidden"></div>
               <div id="vg-ataques-list"></div>
             </div>
-            <div class="card card-semanal">
+            <div class="card card-semanal" data-card="comparativo semanal">
               <div class="card-head">
                 <span class="card-title">Comparativo Semanal</span>
                 <div class="card-actions">
@@ -389,6 +421,44 @@
           </div>
         </div>
 
+        <!-- Equipamentos -->
+        <div id="view-equipamentos" class="view">
+          <div class="asn-toolbar">
+            <div class="asn-stats" id="eq-stats"></div>
+            <button class="ph-btn" id="eq-add" title="Adicionar equipamento" style="background:var(--accent);color:#050B14;border:none;border-radius:6px;padding:6px 12px;font-weight:600;"><i class="ph ph-plus"></i> equipamento</button>
+          </div>
+          <div class="asn-table-wrap card">
+            <div id="eq-header" class="card-head">
+              <span class="card-title">Equipamentos</span>
+              <span class="card-sub" style="font-size:10px;color:var(--text-muted);margin-left:8px;font-weight:400;">multi-vendor · NetFlow/IPFIX por agente</span>
+            </div>
+            <div id="eq-body" class="asn-body"></div>
+          </div>
+          <div class="asn-table-wrap card" style="margin-top:12px;">
+            <div id="eq-chart-header" class="card-head"><span class="card-title">Comparativo entre Equipamentos</span></div>
+            <div id="eq-chart"></div>
+          </div>
+        </div>
+
+        <!-- Clientes -->
+        <div id="view-clientes" class="view">
+          <div class="asn-toolbar">
+            <div class="asn-stats" id="cli-stats"></div>
+            <button class="ph-btn" id="cli-add" title="Adicionar cliente" style="background:var(--accent);color:#050B14;border:none;border-radius:6px;padding:6px 12px;font-weight:600;"><i class="ph ph-plus"></i> cliente</button>
+          </div>
+          <div class="asn-table-wrap card">
+            <div id="cli-header" class="card-head">
+              <span class="card-title">Clientes</span>
+              <span class="card-sub" style="font-size:10px;color:var(--text-muted);margin-left:8px;font-weight:400;">múltiplos blocos CIDR por cliente · uso vs contratado</span>
+            </div>
+            <div id="cli-body" class="asn-body"></div>
+          </div>
+          <div class="asn-table-wrap card" style="margin-top:12px;">
+            <div id="cli-chart-header" class="card-head"><span class="card-title">Uso por Cliente</span></div>
+            <div id="cli-chart"></div>
+          </div>
+        </div>
+
       </main>
     </div>
 
@@ -402,6 +472,7 @@
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
   <script src="https://cdn.jsdelivr.net/npm/socket.io@4.7.2/client-dist/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.min.js"></script>
   <script type="module" src="flow.js"></script>
 </body>
 </html>

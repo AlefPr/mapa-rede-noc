@@ -1,0 +1,15 @@
+# ============================================
+# nfacctd_agents.txt — Mapa de equipamentos -> agent_id
+# (DOCUMENTAL — o pmacct 1.7.x usa uma instância por agente)
+#
+# No pmacct 1.7.8 o agent_id vem da diretiva `agent_id` de cada
+# instância do nfacctd, NÃO deste arquivo (nfacctd_agents_file é v12+).
+#
+# Mapa de referência do agendamento (IP do exportador -> instância):
+#   Exportador             Porta UDP   Instância   agent_id
+#   ------------------------------------------------------------------
+#   192.168.254.1 (core)   2055        nfacctd-1   1  -> CORE-01
+#   192.168.254.2 (border) 2056        nfacctd-2   2  -> BORDER-MAIN
+#   10.0.0.3      (cliente) 2057       nfacctd-3   3  -> CLIENTE-XXX
+#
+# O agent_id precisa bater com a tabela flow_data.equipamentos.agent_id

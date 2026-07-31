@@ -4,6 +4,8 @@ const { autenticarToken } = require('../middleware/auth');
 const geoip = require('geoip-lite');
 const asnLookup = require('../services/asnLookup');
 const rangeMatch = require('../services/rangeMatch');
+const clienteRange = require('../services/clienteRange');
+const { applyEquipamentoFilter, applyClienteFilter } = require('../services/flowFilters');
 
 function formatPeriodo(periodo) {
   const map = { '30m': 1800, '1h': 3600, '6h': 21600, '24h': 86400, '7d': 604800 };
@@ -20,13 +22,20 @@ module.exports = (app, io) => {
   app.get('/api/flow/resumo', auth, async (req, res) => {
     try {
       const segundos = formatPeriodo(req.query.periodo || '1h');
+      const whereBase = ['timestamp >= NOW() - INTERVAL ? SECOND'];
+      const paramsBase = [segundos];
+      await applyEquipamentoFilter(req, whereBase, paramsBase);
+      await applyClienteFilter(req, whereBase, paramsBase);
+      const whereSql = whereBase.join(' AND ');
+      const params = [...paramsBase];
+
       const [rows] = await db.execute(`
         SELECT
           COALESCE(SUM(CASE WHEN bytes_total > 0 THEN bytes_total ELSE 0 END), 0) AS total_bytes,
           COALESCE(SUM(flows_count), 0) AS total_flows
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
-      `, [segundos]);
+        WHERE ${whereSql}
+      `, params);
       const totalBytes = rows[0]?.total_bytes || 0;
       const totalFlows = rows[0]?.total_flows || 0;
       const bps = segundos > 0 ? (totalBytes * 8 / segundos) : 0;
@@ -34,23 +43,23 @@ module.exports = (app, io) => {
       let inBps = bps * 0.6, outBps = bps * 0.4;
       const [inRow] = await db.execute(`
         SELECT COALESCE(SUM(bytes_total), 0) AS b FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND AND ${rangeMatch.sqlNotPrivateClause('ip_dst')}
-      `, [segundos]);
+        WHERE ${whereSql} AND ${rangeMatch.sqlNotPrivateClause('ip_dst')}
+      `, params);
       const [outRow] = await db.execute(`
         SELECT COALESCE(SUM(bytes_total), 0) AS b FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND AND ${rangeMatch.sqlNotPrivateClause('ip_src')}
-      `, [segundos]);
+        WHERE ${whereSql} AND ${rangeMatch.sqlNotPrivateClause('ip_src')}
+      `, params);
       if (inRow[0]?.b > 0) inBps = (inRow[0].b * 8 / segundos);
       if (outRow[0]?.b > 0) outBps = (outRow[0].b * 8 / segundos);
 
       let clienteBps = 0, transitoBps = 0;
-      const cliWhere = rangeMatch.sqlClause('ip_src');
-      const cliWhereDst = rangeMatch.sqlClause('ip_dst');
+      const cliWhere = clienteRange.sqlClause('ip_src');
+      const cliWhereDst = clienteRange.sqlClause('ip_dst');
       if (cliWhere !== '1=0') {
         const [cliRow] = await db.execute(`
           SELECT COALESCE(SUM(bytes_total), 0) AS b FROM flow_data.flow_minuto
-          WHERE timestamp >= NOW() - INTERVAL ? SECOND AND (${cliWhere} OR ${cliWhereDst})
-        `, [segundos]);
+          WHERE ${whereSql} AND (${cliWhere} OR ${cliWhereDst})
+        `, params);
         if (cliRow[0]?.b > 0) clienteBps = (cliRow[0].b * 8 / segundos);
       }
       transitoBps = bps - clienteBps;
@@ -78,26 +87,31 @@ module.exports = (app, io) => {
       else if (tipo === 'ip') { groupCol = 'ip_src, ip_dst, port_src, port_dst, proto'; selectCol = 'ip_src, ip_dst, port_src, port_dst, proto'; }
       else groupCol = selectCol = 'ip_src';
 
+      const where = ['timestamp >= NOW() - INTERVAL ? SECOND'];
+      const params = [segundos];
+      await applyEquipamentoFilter(req, where, params);
+      await applyClienteFilter(req, where, params);
+
       const [rows] = await db.execute(`
         SELECT ${selectCol},
                COALESCE(SUM(bytes_total), 0) AS bytes_total,
                COALESCE(SUM(flows_count), 0) AS total_flows,
                COALESCE(SUM(bytes_total * 8 / ${segundos}), 0) AS bps
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
+        WHERE ${where.join(' AND ')}
         GROUP BY ${groupCol}
         ORDER BY bytes_total DESC
         LIMIT ?
-      `, [segundos, limite]);
+      `, [...params, limite]);
 
       const ipKey = tipo === 'ip_dst' ? 'ip_dst' : tipo === 'ip_src' ? 'ip_src' : null;
       const tagged = rows.map(r => {
         if (ipKey && r[ipKey]) {
           const ip = r[ipKey];
-          r.tipo_ip = rangeMatch.isCliente(ip) ? 'cliente' : (rangeMatch.isPrivate(ip) ? 'interno' : 'transito');
+          r.tipo_ip = clienteRange.matchCliente(ip) ? 'cliente' : (rangeMatch.isPrivate(ip) ? 'interno' : 'transito');
         } else if (tipo === 'ip' && r.ip_src && r.ip_dst) {
-          const srcTipo = rangeMatch.isCliente(r.ip_src) ? 'cliente' : (rangeMatch.isPrivate(r.ip_src) ? 'interno' : 'transito');
-          const dstTipo = rangeMatch.isCliente(r.ip_dst) ? 'cliente' : (rangeMatch.isPrivate(r.ip_dst) ? 'interno' : 'transito');
+          const srcTipo = clienteRange.matchCliente(r.ip_src) ? 'cliente' : (rangeMatch.isPrivate(r.ip_src) ? 'interno' : 'transito');
+          const dstTipo = clienteRange.matchCliente(r.ip_dst) ? 'cliente' : (rangeMatch.isPrivate(r.ip_dst) ? 'interno' : 'transito');
           r.tipo_src = srcTipo; r.tipo_dst = dstTipo;
         }
         return r;
@@ -115,16 +129,21 @@ module.exports = (app, io) => {
       const segundos = formatPeriodo(req.query.periodo || '6h');
       const intervaloSeg = parseInt(req.query.intervalo) || 300;
 
+      const where = ['timestamp >= NOW() - INTERVAL ? SECOND'];
+      const params = [intervaloSeg, segundos];
+      await applyEquipamentoFilter(req, where, params);
+      await applyClienteFilter(req, where, params);
+
       const [rows] = await db.execute(`
         SELECT
           UNIX_TIMESTAMP(timestamp) DIV ? AS bucket,
           COALESCE(SUM(CASE WHEN ${rangeMatch.sqlNotPrivateClause('ip_dst')} THEN bytes_total ELSE 0 END), 0) AS in_bytes,
           COALESCE(SUM(CASE WHEN ${rangeMatch.sqlNotPrivateClause('ip_src')} THEN bytes_total ELSE 0 END), 0) AS out_bytes
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
+        WHERE ${where.join(' AND ')}
         GROUP BY bucket
         ORDER BY bucket ASC
-      `, [intervaloSeg, segundos]);
+      `, params);
 
       const series = rows.map(r => ({
         t: r.bucket * intervaloSeg * 1000,
@@ -462,15 +481,19 @@ module.exports = (app, io) => {
     try {
       const segundos = formatPeriodo(req.query.periodo || '1h');
       const limite = parseInt(req.query.limite) || 30;
+      const where = ['timestamp >= NOW() - INTERVAL ? SECOND'];
+      const params = [segundos];
+      await applyEquipamentoFilter(req, where, params);
+      await applyClienteFilter(req, where, params);
       const [rows] = await db.execute(`
         SELECT ip_src, ip_dst, COALESCE(SUM(bytes_total), 0) AS bytes_total,
                COALESCE(SUM(bytes_total * 8 / ${segundos}), 0) AS bps
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
+        WHERE ${where.join(' AND ')}
         GROUP BY ip_src, ip_dst
         ORDER BY bps DESC
         LIMIT ${limite * 3}
-      `, [segundos]);
+      `, params);
 
       const asnMap = {};
       const seenIps = new Set();
@@ -533,16 +556,20 @@ module.exports = (app, io) => {
   app.get('/api/flow/protocolos', auth, async (req, res) => {
     try {
       const segundos = formatPeriodo(req.query.periodo || '1h');
+      const where = ['timestamp >= NOW() - INTERVAL ? SECOND'];
+      const params = [segundos];
+      await applyEquipamentoFilter(req, where, params);
+      await applyClienteFilter(req, where, params);
       const [rows] = await db.execute(`
         SELECT proto,
                COALESCE(SUM(bytes_total), 0) AS bytes_total,
                COALESCE(SUM(flows_count), 0) AS total_flows,
                COALESCE(SUM(bytes_total * 8 / ${segundos}), 0) AS bps
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
+        WHERE ${where.join(' AND ')}
         GROUP BY proto
         ORDER BY bytes_total DESC
-      `, [segundos]);
+      `, params);
       const protoMap = { 6: 'TCP', 17: 'UDP', 1: 'ICMP', 2: 'IGMP', 47: 'GRE', 50: 'ESP', 51: 'AH', 58: 'ICMPv6', 89: 'OSPF', 132: 'SCTP' };
       const result = rows.map(r => ({
         proto: r.proto,
@@ -564,6 +591,10 @@ module.exports = (app, io) => {
     try {
       const segundos = formatPeriodo(req.query.periodo || '1h');
       const intervalo = segundos < 7200 ? 60 : 300;
+      const where = ['timestamp >= NOW() - INTERVAL ? SECOND'];
+      const params = [intervalo, intervalo, intervalo, intervalo, segundos];
+      await applyEquipamentoFilter(req, where, params);
+      await applyClienteFilter(req, where, params);
       const [rows] = await db.execute(`
         SELECT
           UNIX_TIMESTAMP(timestamp) DIV ? AS bucket,
@@ -571,9 +602,9 @@ module.exports = (app, io) => {
           COALESCE(SUM(CASE WHEN ${rangeMatch.sqlNotPrivateClause('ip_dst')} THEN bytes_total ELSE 0 END * 8 / ?), 0) AS in_bps,
           COALESCE(SUM(CASE WHEN ${rangeMatch.sqlNotPrivateClause('ip_src')} THEN bytes_total ELSE 0 END * 8 / ?), 0) AS out_bps
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
+        WHERE ${where.join(' AND ')}
         GROUP BY bucket ORDER BY bucket ASC
-      `, [intervalo, intervalo, intervalo, intervalo, segundos]);
+      `, params);
 
       const vals = rows.map(r => r.bps);
       if (!vals.length) return res.json({ pico: 0, pico_bps: 0, media: 0, percentil95: 0, amostras: 0 });
@@ -617,17 +648,22 @@ module.exports = (app, io) => {
       const segundos = formatPeriodo(req.query.periodo || '1h');
       const limite = parseInt(req.query.limite) || 20;
 
+      const where = ['timestamp >= NOW() - INTERVAL ? SECOND'];
+      const params = [segundos];
+      await applyEquipamentoFilter(req, where, params);
+      await applyClienteFilter(req, where, params);
+
       const [rows] = await db.execute(`
         SELECT ip_src, ip_dst,
                COALESCE(SUM(bytes_total), 0) AS bytes_total,
                COALESCE(SUM(flows_count), 0) AS total_flows,
                COALESCE(SUM(bytes_total * 8 / ${segundos}), 0) AS bps
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
+        WHERE ${where.join(' AND ')}
         GROUP BY ip_src, ip_dst
         ORDER BY bytes_total DESC
         LIMIT 200
-      `, [segundos]);
+      `, params);
 
       const asnCache = {};
       function getAsnInfo(ip) {
@@ -687,6 +723,11 @@ module.exports = (app, io) => {
       const lado = req.query.lado || 'src';
       const ipCol = lado === 'src' ? 'ip_src' : 'ip_dst';
 
+      const where = ['timestamp >= NOW() - INTERVAL ? SECOND'];
+      const params = [segundos, limite];
+      await applyEquipamentoFilter(req, where, params);
+      await applyClienteFilter(req, where, params);
+
       const [rows] = await db.execute(`
         SELECT
           INET_NTOA(INET_ATON(${ipCol}) & ~(POW(2,32-${prefixo})-1)) AS subnet,
@@ -695,11 +736,11 @@ module.exports = (app, io) => {
           COALESCE(SUM(flows_count), 0) AS total_flows,
           MAX(${ipCol}) AS top_ip
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
+        WHERE ${where.join(' AND ')}
         GROUP BY subnet
         ORDER BY bytes_total DESC
         LIMIT ?
-      `, [segundos, limite]);
+      `, params);
 
       const totalBytes = rows.reduce((s, r) => s + parseFloat(r.bytes_total), 0);
       const result = rows.map(r => ({
@@ -726,18 +767,22 @@ module.exports = (app, io) => {
       const limite = parseInt(req.query.limite) || 15;
       const portas = req.query.portas === 'todas';
 
+      const where = ['timestamp >= NOW() - INTERVAL ? SECOND', 'port_dst IS NOT NULL AND port_dst > 0'];
+      const params = [segundos];
+      await applyEquipamentoFilter(req, where, params);
+      await applyClienteFilter(req, where, params);
+
       const [rows] = await db.execute(`
         SELECT port_dst, proto,
                COALESCE(SUM(bytes_total), 0) AS bytes_total,
                COALESCE(SUM(flows_count), 0) AS total_flows,
                COALESCE(SUM(bytes_total * 8 / ${segundos}), 0) AS bps
         FROM flow_data.flow_minuto
-        WHERE timestamp >= NOW() - INTERVAL ? SECOND
-          AND port_dst IS NOT NULL AND port_dst > 0
+        WHERE ${where.join(' AND ')}
         GROUP BY port_dst, proto
         ORDER BY bytes_total DESC
         LIMIT ${limite * 3}
-      `, [segundos]);
+      `, params);
 
       const appMap = {
         20:'FTP',21:'FTP',22:'SSH',23:'Telnet',25:'SMTP',

@@ -1,0 +1,48 @@
+# ============================================
+# nfacctd.conf — pmacct 1.7.8 (NetFlow/IPFIX collector)
+# MULTI-DISPOSITIVO: um agente (instância) por equipamento
+#
+# O pmacct 1.7.x NÃO suporta nfacctd_agents_file (é v12+).
+# Para identificar cada roteador/equipamento, rode UMA instância
+# do nfacctd por exportador, cada uma numa porta UDP própria,
+# com agent_id distinto. Todas gravam no MESMO banco flow_data.
+#
+#   +------------------+    +------------------+
+#   | CORE-01 (porta 2055)  | BORDER-MAIN (porta 2056)  |
+#   | agent_id: 1      |    | agent_id: 2      |
+#   +------------------+    +------------------+
+#
+# Fluxo: os roteadores enviam NetFlow/IPFIX para portas diferentes
+# desta mesma máquina. O agent_id é gravado no flow_bruto/flow_minuto
+# e casa com a coluna agent_id da tabela flow_data.equipamentos.
+#
+# Copie este arquivo para cada instância e ajuste:
+#   nfacctd_port, pidfile, logfile, agent_id
+# Exemplo de /etc/init.d/nfacctd-1.conf e nfacctd-2.conf
+# ============================================
+daemonize: true
+pidfile: /var/run/nfacctd-1.pid
+logfile: /var/log/pmacct/nfacctd-1.log
+
+nfacctd_port: 2055
+nfacctd_ip: 0.0.0.0
+
+# ID desta instância (deve bater com flow_data.equipamentos.agent_id)
+agent_id: 1
+
+# agent_id identifica o equipamento de origem do fluxo
+aggregate: src_host, dst_host, src_port, dst_port, proto, agent_id
+
+plugins: mysql
+
+sql_host: localhost
+sql_db: flow_data
+sql_user: mapa_user
+sql_passwd: uma_senha_forte_aqui
+sql_table: flow_bruto
+sql_table_version: 1
+sql_refresh_time: 60
+sql_history: 5m
+sql_history_roundoff: m
+sql_dont_try_update: true
+sql_optimize_clauses: true

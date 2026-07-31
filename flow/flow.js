@@ -4,8 +4,58 @@ const state = {
   autenticado: false, usuario: null, viewAtual: 'visao-geral',
   periodo: '30m', pollTimer: null, healthTimer: null, chart: null,
   appsChart: null, protoChart: null, atkChart: null, cmpCharts: [null, null], globalMap: null, globalMarkers: [],
-  socket: null, liveFlows: [], cmpPeriods: ['30m', '6h']
+  socket: null, liveFlows: [], cmpPeriods: ['30m', '6h'],
+  equipamentos: [], equipamentoAtivo: null,
+  clientes: [], clienteAtivo: null,
+  hiddenCards: [],
+  dashboards: [], dashboardAtivo: null, editandoLayout: false, gs: null
 };
+
+const PREFS_KEY = 'flow-prefs';
+
+function loadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    if (p.periodo && ['30m', '1h', '6h', '24h', '7d'].includes(p.periodo)) state.periodo = p.periodo;
+    if (p.equipamentoAtivo) state.equipamentoAtivo = String(p.equipamentoAtivo);
+    if (p.clienteAtivo) state.clienteAtivo = String(p.clienteAtivo);
+    if (Array.isArray(p.hiddenCards)) state.hiddenCards = p.hiddenCards;
+  } catch {}
+}
+
+function savePrefs() {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
+      periodo: state.periodo,
+      equipamentoAtivo: state.equipamentoAtivo,
+      clienteAtivo: state.clienteAtivo,
+      hiddenCards: state.hiddenCards
+    }));
+  } catch {}
+}
+
+function cardKeyOf(gridItem) {
+  if (gridItem.dataset.card) return gridItem.dataset.card;
+  const inner = gridItem.querySelector('.card[data-card]');
+  return inner ? inner.dataset.card : null;
+}
+
+function applyHiddenCards() {
+  document.querySelectorAll('#view-visao-geral .dash-grid > *').forEach(el => {
+    const key = cardKeyOf(el);
+    el.style.display = (key && state.hiddenCards.includes(key)) ? 'none' : '';
+  });
+}
+
+function toggleCardHidden(key) {
+  if (state.hiddenCards.includes(key)) {
+    state.hiddenCards = state.hiddenCards.filter(k => k !== key);
+  } else {
+    state.hiddenCards.push(key);
+  }
+  savePrefs();
+  applyHiddenCards();
+}
 
 async function authVerify() {
   try {
@@ -25,7 +75,16 @@ async function authVerify() {
 }
 
 async function apiFetch(path, opts = {}) {
-  const res = await fetch(API + path, opts);
+  let finalPath = opts.raw ? path : API + path;
+  if (state.equipamentoAtivo && !opts.skipEqFilter) {
+    const sep = finalPath.includes('?') ? '&' : '?';
+    finalPath += `${sep}equipamento_id=${state.equipamentoAtivo}`;
+  }
+  if (state.clienteAtivo && !opts.skipClienteFilter) {
+    const sep = finalPath.includes('?') ? '&' : '?';
+    finalPath += `${sep}cliente_id=${state.clienteAtivo}`;
+  }
+  const res = await fetch(finalPath, opts);
   if (res.status === 401) { window.location.href = '/'; throw new Error('401'); }
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -100,19 +159,22 @@ function exportCsv(data, filename) {
 }
 
 // ── Sidebar Nav ──
+function setView(view) {
+  if (view === state.viewAtual) { renderView(view); return; }
+  state.viewAtual = view;
+  document.querySelectorAll('.sb-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.sb-btn[data-view="${view}"]`);
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = $(`view-${view}`);
+  if (el) el.classList.add('active');
+  updatePageHead(view);
+  renderView(view);
+}
+
 function initNav() {
   document.querySelectorAll('.sb-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const view = btn.dataset.view;
-      if (view === state.viewAtual) return;
-      state.viewAtual = view;
-      document.querySelectorAll('.sb-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      $(`view-${view}`).classList.add('active');
-      updatePageHead(view);
-      renderView(view);
-    });
+    btn.addEventListener('click', () => setView(btn.dataset.view));
   });
 }
 
@@ -123,7 +185,9 @@ function updatePageHead(view) {
     'global': 'Mapa Global', 'comparar': 'Comparar Períodos',
     'asn': 'ASN / Redes',
     'subnets': 'Sub-redes',
-    'matriz': 'Matriz ASN'
+    'matriz': 'Matriz ASN',
+    'equipamentos': 'Equipamentos',
+    'clientes': 'Clientes'
   };
   const subs = {
     'visao-geral': 'monitoramento de tráfego em tempo real',
@@ -134,7 +198,9 @@ function updatePageHead(view) {
     'comparar': 'compare o tráfego entre dois períodos',
     'asn': 'análise por sistema autônomo',
     'subnets': 'agrupamento por prefixo de rede',
-    'matriz': 'tráfego entre sistemas autônomos'
+    'matriz': 'tráfego entre sistemas autônomos',
+    'equipamentos': 'dispositivos de rede por agent_id (multi-vendor)',
+    'clientes': 'clientes com múltiplos blocos de IP e uso vs contratado'
   };
   $('view-title').textContent = titles[view] || view;
   $('view-subtitle').textContent = subs[view] || '';
@@ -150,6 +216,8 @@ function renderView(view) {
   else if (view === 'asn') renderAsnView();
   else if (view === 'subnets') renderSubnetsView();
   else if (view === 'matriz') renderMatrizView();
+  else if (view === 'equipamentos') renderEquipamentosView();
+  else if (view === 'clientes') renderClientesView();
 }
 
 // ── Health ──
@@ -252,7 +320,7 @@ async function renderVisaoGeral() {
       apiFetch('/ataques').catch(() => null)
     ]);
 
-    $('vg-kpis').innerHTML = `
+    if ($('vg-kpis')) $('vg-kpis').innerHTML = `
       <div class="mkpi in">
         <span class="mkpi-label">Inbound</span>
         <span class="mkpi-value">${fmtBps(resumo.in_bps)}</span>
@@ -289,7 +357,8 @@ async function renderVisaoGeral() {
     const sbAtk = $('sb-ataques');
     const notifBadge = $('notif-badge');
 
-    if (ataques && Array.isArray(ataques)) {
+    if (banner) {
+      if (ataques && Array.isArray(ataques)) {
       const ativos = ataques.filter(a => a.status === 'ativo');
       if (ativos.length > 0) {
         banner.className = 'vg-banner';
@@ -323,6 +392,7 @@ async function renderVisaoGeral() {
       if (sbAtk) sbAtk.innerHTML = '<i class="ph ph-shield-slash"></i>';
       if (notifBadge) notifBadge.classList.add('hidden');
     }
+    }
 
     renderChart(series);
     renderProtocolos();
@@ -330,28 +400,32 @@ async function renderVisaoGeral() {
     renderComparativoSemanal();
 
     const body = $('vg-talkers');
-    if (!Array.isArray(talkers) || !talkers.length) {
-      body.innerHTML = '<div style="padding:12px 0;color:var(--text-muted);font-style:italic;text-align:center;">sem dados</div>';
-    } else {
-      body.innerHTML = talkers.slice(0, 8).map((t, i) => {
-        const src = esc(t.ip_src || '—');
-        const dst = esc(t.ip_dst || '—');
-        return `<div class="tt-row">
-          <span class="tt-num">${i + 1}</span>
-          <span class="tt-src">${src}</span>
-          <span class="tt-arrow">→</span>
-          <span class="tt-dst">${dst}</span>
-          <span class="tt-val">${fmtBps(t.bps)}</span>
-        </div>`;
-      }).join('');
+    if (body) {
+      if (!Array.isArray(talkers) || !talkers.length) {
+        body.innerHTML = '<div style="padding:12px 0;color:var(--text-muted);font-style:italic;text-align:center;">sem dados</div>';
+      } else {
+        body.innerHTML = talkers.slice(0, 8).map((t, i) => {
+          const src = esc(t.ip_src || '—');
+          const dst = esc(t.ip_dst || '—');
+          return `<div class="tt-row">
+            <span class="tt-num">${i + 1}</span>
+            <span class="tt-src">${src}</span>
+            <span class="tt-arrow">→</span>
+            <span class="tt-dst">${dst}</span>
+            <span class="tt-val">${fmtBps(t.bps)}</span>
+          </div>`;
+        }).join('');
+      }
     }
 
   } catch (e) {
-    $('vg-kpis').innerHTML = `<div style="grid-column:1/-1;padding:20px 0;text-align:center;color:var(--text-muted);">Erro ao carregar: ${esc(e.message)}</div>`;
+    const k = $('vg-kpis');
+    if (k) k.innerHTML = `<div style="grid-column:1/-1;padding:20px 0;text-align:center;color:var(--text-muted);">Erro ao carregar: ${esc(e.message)}</div>`;
   }
 }
 
 function renderChart(series) {
+  if (!$('vg-chart')) return;
   if (!series || !series.length) {
     $('vg-chart').innerHTML = '<div style="padding:20px 0;text-align:center;color:var(--text-muted);">sem dados de tráfego</div>';
     return;
@@ -687,12 +761,57 @@ function initPeriod() {
       document.querySelectorAll('#period-bar .per-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.periodo = btn.dataset.period;
+      savePrefs();
       renderView(state.viewAtual);
     });
   });
 }
 
 // ── Card Actions ──
+const CARD_VIEWS = {
+  'top talkers': 'top-talkers',
+  'ataques': 'ataques',
+  'comparativo semanal': 'comparar'
+};
+
+function openCardMenu(btn) {
+  closeCardMenu();
+  const card = btn.closest('.card');
+  const key = card ? card.dataset.card : null;
+  const menu = document.createElement('div');
+  menu.className = 'card-menu';
+  const items = [];
+  items.push({ icon: 'ph-arrows-clockwise', label: 'Atualizar', fn: () => renderVisaoGeral() });
+  if (key && CARD_VIEWS[key]) {
+    items.push({ icon: 'ph-arrows-out', label: 'Abrir na view', fn: () => setView(CARD_VIEWS[key]) });
+  }
+  items.push({ icon: 'ph-eye-slash', label: 'Ocultar card', fn: () => { if (key) toggleCardHidden(key); }, danger: key === null });
+  menu.innerHTML = items.map(it =>
+    `<button class="card-menu-item ${it.danger ? 'danger' : ''}" data-idx="${items.indexOf(it)}">
+      <i class="ph ${it.icon}"></i>${it.label}
+    </button>`).join('');
+  document.body.appendChild(menu);
+  const r = btn.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = Math.min(r.bottom + 4, window.innerHeight - 150) + 'px';
+  menu.style.left = Math.max(8, Math.min(r.right - 150, window.innerWidth - 160)) + 'px';
+  menu.querySelectorAll('.card-menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = parseInt(item.dataset.idx);
+      closeCardMenu();
+      items[idx].fn();
+    });
+  });
+  setTimeout(() => {
+    document.addEventListener('click', closeCardMenu, { once: true });
+  }, 0);
+}
+
+function closeCardMenu() {
+  const m = document.querySelector('.card-menu');
+  if (m) m.remove();
+}
+
 function initCardActions() {
   document.addEventListener('click', e => {
     const btn = e.target.closest('.ca-btn[data-action]');
@@ -702,8 +821,336 @@ function initCardActions() {
       document.querySelector(`.sb-btn[data-view="${btn.dataset.view}"]`).click();
     } else if (action === 'refresh-kpis') {
       renderVisaoGeral();
+    } else if (action === 'menu') {
+      e.stopPropagation();
+      openCardMenu(btn);
     }
   });
+}
+
+function initCustomizePanel() {
+  const btn = $('ph-customize');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    closeCardMenu();
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:999;';
+    const cards = [...document.querySelectorAll('#view-visao-geral .dash-grid > *')]
+      .map(el => ({ key: cardKeyOf(el), el }))
+      .filter(c => c.key);
+    overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:340px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+      <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Personalizar dashboard</div>
+      <div style="display:grid;gap:8px;">
+        ${cards.map(c => `<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" data-key="${esc(c.key)}" ${state.hiddenCards.includes(c.key) ? '' : 'checked'} style="accent-color:var(--accent);">
+          ${esc(c.key)}
+        </label>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+        <button class="eq-btn" id="cus-cancel">Cancelar</button>
+        <button id="cus-save" style="background:var(--accent);color:#050B14;border:none;border-radius:6px;padding:6px 14px;font-weight:600;font-size:12px;cursor:pointer;">Aplicar</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector('#cus-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#cus-save').addEventListener('click', () => {
+      const hidden = cards
+        .filter(c => !overlay.querySelector(`input[data-key="${CSS.escape(c.key)}"]`).checked)
+        .map(c => c.key);
+      state.hiddenCards = hidden;
+      savePrefs();
+      applyHiddenCards();
+      overlay.remove();
+    });
+  });
+}
+
+// ── Dashboards (F3) ──
+const WIDGET_DEFAULTS = {
+  'tráfego': { w: 12, h: 10 },
+  'visão geral': { w: 12, h: 8 },
+  'capacidade': { w: 6, h: 8 },
+  'protocolos': { w: 6, h: 8 },
+  'flows ao vivo': { w: 6, h: 10 },
+  'top talkers': { w: 6, h: 10 },
+  'ataques': { w: 6, h: 10 },
+  'comparativo semanal': { w: 12, h: 8 }
+};
+const WIDGET_TYPES = {
+  'chart': 'tráfego', 'kpis': 'visão geral', 'metricas': 'capacidade',
+  'protocolos': 'protocolos', 'live': 'flows ao vivo', 'talkers': 'top talkers',
+  'ataques': 'ataques', 'semanal': 'comparativo semanal'
+};
+
+function dashboardAtual() {
+  if (!state.dashboardAtivo) return null;
+  return state.dashboards.find(d => String(d.id) === String(state.dashboardAtivo)) || null;
+}
+
+async function loadDashboards() {
+  try {
+    state.dashboards = (await apiFetch('/dashboards', { skipEqFilter: true, skipClienteFilter: true })) || [];
+  } catch {
+    state.dashboards = [];
+  }
+}
+
+function destroyGrid() {
+  if (state.gs) {
+    try { state.gs.destroy(false); } catch {}
+    state.gs = null;
+  }
+  const grid = $('dash-grid');
+  if (!grid) return;
+  grid.classList.remove('gs-active');
+  grid.querySelectorAll('.grid-stack-item').forEach(item => {
+    const content = item.querySelector('.grid-stack-item-content');
+    if (content && content.firstElementChild) {
+      content.firstElementChild.style.display = '';
+      item.parentNode.insertBefore(content.firstElementChild, item);
+    }
+    item.remove();
+  });
+  grid.querySelectorAll('.card, .live-feed-wrap').forEach(el => { el.style.display = ''; });
+}
+
+function buildGridItems(widgets) {
+  const grid = $('dash-grid');
+  const byKey = {};
+  [...grid.children].forEach(el => {
+    const k = cardKeyOf(el);
+    if (k) byKey[k] = el;
+  });
+  const used = new Set();
+  widgets.forEach(w => {
+    const el = byKey[w.tipo || w.key];
+    if (!el || used.has(el)) return;
+    used.add(el);
+    const key = cardKeyOf(el);
+    const size = WIDGET_DEFAULTS[key] || { w: 6, h: 8 };
+    const item = document.createElement('div');
+    item.className = 'grid-stack-item';
+    item.setAttribute('data-gs-x', w.x ?? 0);
+    item.setAttribute('data-gs-y', w.y ?? 0);
+    item.setAttribute('data-gs-w', w.w || size.w);
+    item.setAttribute('data-gs-h', w.h || size.h);
+    item.dataset.key = key;
+    const content = document.createElement('div');
+    content.className = 'grid-stack-item-content';
+    el.parentNode.insertBefore(item, el);
+    item.appendChild(content);
+    content.appendChild(el);
+  });
+  [...grid.children].forEach(el => {
+    if (el.classList.contains('grid-stack-item')) return;
+    const k = cardKeyOf(el);
+    if (k && !used.has(el)) el.style.display = 'none';
+  });
+}
+
+function initGrid(readonly) {
+  const grid = $('dash-grid');
+  grid.classList.add('gs-active');
+  if (typeof GridStack === 'undefined') {
+    $('dash-grid').innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">GridStack não carregado (offline?)</div>';
+    return null;
+  }
+  const opts = {
+    column: 12, cellHeight: 26, margin: 8, float: false,
+    animate: true, handle: '.card-head', disableDrag: readonly, disableResize: readonly
+  };
+  state.gs = GridStack.init(opts, grid);
+  return state.gs;
+}
+
+function applyDashboard(dash) {
+  destroyGrid();
+  const widgets = (dash && Array.isArray(dash.widgets) && dash.widgets.length)
+    ? dash.widgets
+    : Object.keys(WIDGET_DEFAULTS).map(key => {
+        const size = WIDGET_DEFAULTS[key];
+        return { tipo: key, titulo: key, x: 0, y: 0, w: size.w, h: size.h };
+      });
+  buildGridItems(widgets);
+  const gs = initGrid(!state.editandoLayout);
+  if (gs && state.editandoLayout) attachRemoveButtons();
+  renderVisaoGeral();
+  if (gs) gs.on('change', () => {});
+}
+
+function enterEditMode() {
+  state.editandoLayout = true;
+  $('dash-palette').style.display = 'flex';
+  const dash = dashboardAtual();
+  applyDashboard(dash);
+}
+
+function exitEditMode() {
+  state.editandoLayout = false;
+  $('dash-palette').style.display = 'none';
+  destroyGrid();
+  if (state.dashboardAtivo) applyDashboard(dashboardAtual());
+  else renderVisaoGeral();
+}
+
+function collectWidgets() {
+  const out = [];
+  document.querySelectorAll('#dash-grid .grid-stack-item').forEach(item => {
+    const n = item.gridstackNode || item._gridstackNode || {};
+    out.push({
+      tipo: item.dataset.key,
+      titulo: item.dataset.key,
+      x: n.x ?? 0, y: n.y ?? 0, w: n.w ?? 6, h: n.h ?? 8
+    });
+  });
+  return out;
+}
+
+async function saveLayout() {
+  if (!state.gs) return;
+  const widgets = collectWidgets();
+  let dash = dashboardAtual();
+  if (!dash) {
+    const nome = prompt('Nome do novo dashboard:') || '';
+    if (!nome) return;
+    const r = await apiFetch('/dashboards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome, widgets }) });
+    state.dashboardAtivo = r.id;
+    await loadDashboards();
+  } else {
+    await apiFetch(`/dashboards/${dash.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: dash.nome, widgets }) });
+  }
+  exitEditMode();
+}
+
+function attachRemoveButtons() {
+  document.querySelectorAll('#dash-grid .grid-stack-item').forEach(item => {
+    if (item.querySelector('.widget-rm')) return;
+    const rm = document.createElement('button');
+    rm.className = 'widget-rm';
+    rm.innerHTML = '<i class="ph ph-x"></i>';
+    rm.title = 'Remover widget';
+    rm.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (state.gs) { try { state.gs.removeWidget(item, false); } catch { item.remove(); } }
+    });
+    item.appendChild(rm);
+  });
+}
+
+function openDashMenu() {
+  closeCardMenu();
+  const menu = document.createElement('div');
+  menu.className = 'card-menu';
+  const btn = $('ph-dash');
+  const items = [];
+  items.push({ icon: 'ph-plus', label: 'Novo dashboard', fn: async () => {
+    const nome = prompt('Nome do novo dashboard:') || '';
+    if (!nome) return;
+    await loadDashboards();
+    const r = await apiFetch('/dashboards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome, widgets: [] }) });
+    await loadDashboards();
+    state.dashboardAtivo = r.id;
+    enterEditMode();
+  }});
+  if (state.dashboards.length) {
+    items.push({ divider: true });
+    state.dashboards.forEach(d => {
+      items.push({ icon: d.ativo ? 'ph-check-circle' : 'ph-circle', label: esc(d.nome), active: String(state.dashboardAtivo) === String(d.id), fn: () => {
+        state.dashboardAtivo = String(d.id);
+        exitEditMode();
+      }});
+    });
+  }
+  items.push({ divider: true });
+  items.push({ icon: state.editandoLayout ? 'ph-check' : 'ph-pencil-simple', label: state.editandoLayout ? 'Sair da edição' : 'Editar layout', fn: () => {
+    if (state.editandoLayout) exitEditMode();
+    else enterEditMode();
+  }});
+  items.push({ icon: 'ph-layout', label: 'Layout padrão', active: !state.dashboardAtivo, fn: () => {
+    state.dashboardAtivo = null;
+    exitEditMode();
+    renderVisaoGeral();
+  }});
+  if (dashboardAtual()) {
+    items.push({ icon: 'ph-trash', label: 'Excluir dashboard', danger: true, fn: async () => {
+      const d = dashboardAtual();
+      if (!confirm(`Excluir o dashboard "${d.nome}"?`)) return;
+      await apiFetch(`/dashboards/${d.id}`, { method: 'DELETE' });
+      await loadDashboards();
+      state.dashboardAtivo = null;
+      exitEditMode();
+      renderVisaoGeral();
+    }});
+  }
+  menu.innerHTML = items.map((it, idx) => it.divider
+    ? '<div style="height:1px;background:var(--border);margin:4px 6px;"></div>'
+    : `<button class="card-menu-item ${it.danger ? 'danger' : ''}" data-idx="${idx}">
+        <i class="ph ${it.icon}"></i>${it.label}${it.active ? ' <span style="margin-left:auto;color:var(--accent);font-size:10px;">●</span>' : ''}
+      </button>`).join('');
+  document.body.appendChild(menu);
+  const r = btn.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = Math.min(r.bottom + 4, window.innerHeight - 200) + 'px';
+  menu.style.left = Math.max(8, Math.min(r.right - 170, window.innerWidth - 180)) + 'px';
+  menu.querySelectorAll('.card-menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = parseInt(item.dataset.idx);
+      closeCardMenu();
+      items[idx].fn();
+    });
+  });
+  setTimeout(() => { document.addEventListener('click', closeCardMenu, { once: true }); }, 0);
+}
+
+function initDashUI() {
+  const btn = $('ph-dash');
+  if (!btn) return;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeCardMenu();
+    openDashMenu();
+  });
+  const palette = $('dash-palette');
+  if (palette) {
+      palette.querySelectorAll('[data-widget]').forEach(b => {
+      b.addEventListener('click', () => {
+        if (!state.gs || !state.editandoLayout) return;
+        const key = WIDGET_TYPES[b.dataset.widget];
+        if (!key) return;
+        const existente = [...document.querySelectorAll('#dash-grid .grid-stack-item')].find(x => x.dataset.key === key);
+        if (existente) return;
+        const size = WIDGET_DEFAULTS[key];
+        const src = [...gridChildren()].find(x => cardKeyOf(x) === key);
+        if (!src) return;
+        const item = document.createElement('div');
+        item.className = 'grid-stack-item';
+        item.setAttribute('data-gs-x', 0); item.setAttribute('data-gs-y', 99);
+        item.setAttribute('data-gs-w', size.w); item.setAttribute('data-gs-h', size.h);
+        item.dataset.key = key;
+        const content = document.createElement('div');
+        content.className = 'grid-stack-item-content';
+        item.appendChild(content);
+        gridAppend(item, src, content);
+      });
+    });
+    $('dash-save').addEventListener('click', saveLayout);
+    $('dash-cancel-edit').addEventListener('click', () => exitEditMode());
+  }
+}
+
+function gridChildren() {
+  return [...$('dash-grid').children];
+}
+
+function gridAppend(item, src, content) {
+  const grid = $('dash-grid');
+  src.style.display = '';
+  grid.appendChild(item);
+  content.appendChild(src);
+  if (state.gs) state.gs.makeWidget(item);
+  attachRemoveButtons();
+  renderVisaoGeral();
 }
 
 // ── IP Cell Actions ──
@@ -755,8 +1202,8 @@ function initLiveFeed() {
     state.socket.on('connect', () => {
       setLiveDot('ok');
       setLiveAgo('conectado');
-      $('live-feed-empty').textContent = 'conectado, aguardando dados...';
-    });
+      const fe = $('live-feed-empty');
+      if (fe) fe.textContent = 'conectado, aguardando dados...';    });
 
     state.socket.on('disconnect', (reason) => {
       setLiveDot('err');
@@ -768,7 +1215,8 @@ function initLiveFeed() {
       const msg = err.message || '';
       if (msg.includes('CORS') || msg.includes('cross')) {
         setLiveAgo('CORS bloqueado');
-        $('live-feed-empty').textContent = 'erro CORS — verifique allowedOrigins no backend';
+      const fe = $('live-feed-empty');
+      if (fe) fe.textContent = 'erro CORS — verifique allowedOrigins no backend';
       } else if (msg.includes('xhr') || msg.includes('transport')) {
         setLiveAgo('transporte falhou');
       } else {
@@ -1150,6 +1598,7 @@ function mcBar(a, b) {
   return `<span style="display:inline-flex;gap:2px;align-items:center;margin-top:2px;"><span style="display:inline-block;width:${wa}px;height:3px;border-radius:2px;background:var(--green);"></span><span style="display:inline-block;width:${wb}px;height:3px;border-radius:2px;background:var(--blue);"></span></span>`;
 }
 async function renderMetricas() {
+  if (!$('vg-metricas')) return;
   try {
     const data = await apiFetch(`/metricas?periodo=${state.periodo}`);
     if (!data || !data.amostras) {
@@ -1203,6 +1652,7 @@ function semBar(a, b) {
   </span>`;
 }
 async function renderComparativoSemanal() {
+  if (!$('vg-semanal')) return;
   try {
     const data = await apiFetch('/comparativo-semanal');
     if (!data || !data.esta_semana || !data.esta_semana.amostras) {
@@ -1284,6 +1734,7 @@ async function renderComparativoSemanal() {
 
 // ── Protocol Distribution ──
 async function renderProtocolos() {
+  if (!$('vg-protocolos')) return;
   try {
     const res = await apiFetch(`/protocolos?periodo=${state.periodo}`);
     const data = res.protocolos || [];
@@ -1373,6 +1824,393 @@ async function renderMatrizView() {
   }
 }
 
+// ── Equipamentos View ──
+async function loadEquipamentos() {
+  try {
+    state.equipamentos = (await apiFetch('/equipamentos', { skipEqFilter: true })) || [];
+  } catch {
+    state.equipamentos = [];
+  }
+  const sel = $('tb-eq-select');
+  if (!sel) return;
+  const prev = sel.value || state.equipamentoAtivo;
+  sel.innerHTML = '<option value="">Todos os equipamentos</option>' +
+    state.equipamentos.map(e => `<option value="${e.id}">${esc(e.nome)}${e.localidade ? ' · ' + esc(e.localidade) : ''}</option>`).join('');
+  if (prev && state.equipamentos.some(e => e.id == prev)) {
+    sel.value = prev;
+    state.equipamentoAtivo = String(prev);
+  } else { sel.value = ''; state.equipamentoAtivo = null; }
+}
+
+function initEqSelect() {
+  const sel = $('tb-eq-select');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    state.equipamentoAtivo = sel.value || null;
+    savePrefs();
+    renderView(state.viewAtual);
+    updatePageHead(state.viewAtual);
+  });
+}
+
+async function renderEquipamentosView() {
+  const body = $('eq-body');
+  if (!body) return;
+  try {
+    await loadEquipamentos();
+    const eqs = state.equipamentos;
+    if (!eqs.length) {
+      body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">Nenhum equipamento cadastrado. Reinicie o nfacctd com <code style="font-family:var(--mono);font-size:11px;">agent_id</code> por instância e cadastre aqui.</div>';
+      $('eq-stats').innerHTML = '';
+      $('eq-chart').innerHTML = '';
+      return;
+    }
+    const totalBps = eqs.reduce((s, e) => s + (e.bps || 0), 0);
+    $('eq-stats').innerHTML = `<span class="asn-stat">${fmtNum(eqs.length)} dispositivos</span><span class="asn-stat">${fmtBps(totalBps)} total</span>`;
+    body.innerHTML = `<table class="asn-table">
+      <thead><tr><th>Nome</th><th>Agente</th><th>Fabricante / Modelo</th><th>Localização</th><th>IP</th><th>Tráfego</th><th>%</th><th>Ações</th></tr></thead>
+      <tbody>${eqs.map(e => {
+        const pct = totalBps > 0 ? Math.round((e.bps || 0) / totalBps * 100) : 0;
+        const ativo = state.equipamentoAtivo && String(state.equipamentoAtivo) === String(e.id);
+        return `<tr class="eq-row" data-id="${e.id}">
+          <td style="font-weight:600;">${esc(e.nome)}</td>
+          <td><span class="eq-badge eq-fab">agent ${esc(e.agent_id)}</span></td>
+          <td class="eq-modelo">${esc(e.fabricante || '—')} ${esc(e.modelo || '')}</td>
+          <td class="eq-modelo">${esc(e.localidade || '—')}</td>
+          <td style="font-family:var(--mono);font-size:11px;">${esc(e.ip || '—')}</td>
+          <td class="traf">${fmtBps(e.bps || 0)}</td>
+          <td class="pct">${pct}%<span class="bar-bg"><span class="bar-fill" style="width:${pct}%"></span></span></td>
+          <td>
+            <button class="eq-btn ${ativo ? 'eq-ativo' : ''}" data-act="filtrar" title="Filtrar dashboard por este equipamento"><i class="ph ph-funnel"></i></button>
+            <button class="eq-btn" data-act="editar"><i class="ph ph-pencil-simple"></i></button>
+            <button class="eq-btn" data-act="excluir" style="color:#f87171;"><i class="ph ph-trash"></i></button>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+    renderEqChart(eqs);
+    $('eq-chart-header').querySelector('.card-title').textContent = `Comparativo entre Equipamentos · ${fmtBps(totalBps)} total`;
+  } catch {
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">erro ao carregar</div>';
+  }
+}
+
+function renderEqChart(eqs) {
+  const el = $('eq-chart');
+  const labels = eqs.map(e => esc(e.nome));
+  const values = eqs.map(e => Math.round((e.bps || 0) / 1000));
+  const max = Math.max(...values, 1);
+  el.innerHTML = `<div style="display:flex;align-items:flex-end;gap:14px;padding:16px;height:160px;border-bottom:1px solid var(--border);">
+    ${values.map((v, i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">${fmtBps(eqs[i].bps || 0)}</span>
+      <div style="width:70%;max-width:60px;height:${Math.max(4, Math.round(v / max * 100))}px;background:linear-gradient(180deg,var(--accent),rgba(139,92,246,0.25));border-radius:4px 4px 0 0;" title="${esc(eqs[i].nome)}: ${fmtBps(eqs[i].bps || 0)}"></div>
+    </div>`).join('')}
+  </div>
+  <div style="display:flex;gap:14px;padding:8px 16px;">
+    ${labels.map(l => `<div style="flex:1;text-align:center;font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${l}">${l}</div>`).join('')}
+  </div>`;
+}
+
+function initEqBody() {
+  const body = $('eq-body');
+  if (!body) return;
+  body.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-act]');
+    const row = ev.target.closest('tr[data-id]');
+    if (!row) return;
+    const id = row.dataset.id;
+    const eq = state.equipamentos.find(e => String(e.id) === id);
+    if (!eq) return;
+    if (!btn) {
+      if (ev.target.closest('.traf') || ev.target.closest('.pct')) return;
+      state.equipamentoAtivo = id;
+      const sel = $('tb-eq-select');
+      if (sel) sel.value = id;
+      setView('visao-geral');
+      return;
+    }
+    const act = btn.dataset.act;
+    if (act === 'filtrar') {
+      state.equipamentoAtivo = state.equipamentoAtivo && String(state.equipamentoAtivo) === id ? null : id;
+      const sel = $('tb-eq-select');
+      if (sel) sel.value = state.equipamentoAtivo || '';
+      renderEquipamentosView();
+    } else if (act === 'editar') {
+      eqModal(eq);
+    } else if (act === 'excluir') {
+      if (confirm(`Excluir equipamento "${eq.nome}"?`)) deleteEquipamento(eq);
+    }
+  });
+  const add = $('eq-add');
+  if (add) add.addEventListener('click', () => eqModal(null));
+}
+
+function eqModal(eq) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:999;';
+  const f = (v, ph, w = '100%') => `<input id="eqm-${v}" value="${esc(eq ? eq[v] : '')}" placeholder="${ph}" style="width:${w};background:#0a0f1a;border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;">`;
+  overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:420px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px;">${eq ? 'Editar equipamento' : 'Novo equipamento'}</div>
+    <div style="display:grid;gap:10px;">
+      ${f('nome', 'Nome (ex.: Borda-SP-01)')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${f('fabricante', 'Fabricante', '100%')}${f('modelo', 'Modelo', '100%')}</div>
+      ${f('tipo', 'Tipo (roteador, firewall, switch)', '100%')}
+      ${f('ip', 'IP de gerenciamento')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${f('localidade', 'Localização', '100%')}${f('agent_id', 'agent_id (porta do nfacctd)', '100%')}</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button id="eqm-cancel" class="eq-btn">Cancelar</button>
+      <button id="eqm-save" style="background:var(--accent);color:#050B14;border:none;border-radius:6px;padding:6px 14px;font-weight:600;font-size:12px;cursor:pointer;">Salvar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#eqm-cancel').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#eqm-save').addEventListener('click', async () => {
+    const val = id => overlay.querySelector('#eqm-' + id).value.trim();
+    const payload = {
+      nome: val('nome'), fabricante: val('fabricante'), modelo: val('modelo'),
+      tipo: val('tipo'), ip: val('ip'), localidade: val('localidade'),
+      agent_id: val('agent_id')
+    };
+    if (!payload.nome || payload.agent_id === '') { alert('Nome e agent_id são obrigatórios.'); return; }
+    try {
+      if (eq) await apiFetch(`/equipamentos/${eq.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      else await apiFetch('/equipamentos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      overlay.remove();
+      renderEquipamentosView();
+    } catch (err) { alert('Erro ao salvar: ' + err.message); }
+  });
+}
+
+async function deleteEquipamento(eq) {
+  try {
+    await apiFetch(`/equipamentos/${eq.id}`, { method: 'DELETE' });
+    if (String(state.equipamentoAtivo) === String(eq.id)) {
+      state.equipamentoAtivo = null;
+      const sel = $('tb-eq-select');
+      if (sel) sel.value = '';
+    }
+    renderEquipamentosView();
+  } catch (err) { alert('Erro ao excluir: ' + err.message); }
+}
+
+// ── Clientes View ──
+async function loadClientes() {
+  try {
+    state.clientes = (await apiFetch('/clientes', { raw: true, skipEqFilter: true, skipClienteFilter: true })) || [];
+  } catch {
+    state.clientes = [];
+  }
+  const sel = $('tb-cliente-select');
+  if (!sel) return;
+  const prev = sel.value || state.clienteAtivo;
+  sel.innerHTML = '<option value="">Todos os clientes</option>' +
+    state.clientes.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+  if (prev && state.clientes.some(c => c.id == prev)) {
+    sel.value = prev;
+    state.clienteAtivo = String(prev);
+  } else { sel.value = ''; state.clienteAtivo = null; }
+}
+
+function initClienteSelect() {
+  const sel = $('tb-cliente-select');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    state.clienteAtivo = sel.value || null;
+    savePrefs();
+    renderView(state.viewAtual);
+    updatePageHead(state.viewAtual);
+  });
+}
+
+async function renderClientesView() {
+  const body = $('cli-body');
+  if (!body) return;
+  try {
+    await loadClientes();
+    const resumo = await apiFetch('/clientes/resumo', { skipClienteFilter: true });
+    const clientes = state.clientes;
+    const uso = {};
+    (resumo || []).forEach(r => { uso[r.id] = r; });
+    if (!clientes.length) {
+      body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">Nenhum cliente cadastrado. Cadastre os clientes e seus blocos CIDR.</div>';
+      $('cli-stats').innerHTML = '<span class="asn-stat">usando ranges do .env (CLIENTE_RANGES) como fallback</span>';
+      $('cli-chart').innerHTML = '';
+      $('cli-chart-header').querySelector('.card-title').textContent = 'Uso por Cliente';
+      return;
+    }
+    const totalBanda = clientes.reduce((s, c) => s + (c.banda_contratada_mbps || 0), 0);
+    const totalUso = resumo.reduce((s, r) => s + r.bps, 0);
+    $('cli-stats').innerHTML = `<span class="asn-stat">${fmtNum(clientes.length)} clientes</span><span class="asn-stat">${fmtBps(totalUso)} em uso</span><span class="asn-stat">${fmtNum(totalBanda)} Mbps contratados</span>`;
+    body.innerHTML = `<table class="asn-table">
+      <thead><tr><th>Cliente</th><th>Blocos</th><th>Plano</th><th>Contratado</th><th>Uso atual</th><th>% uso</th><th>Situação</th><th>Ações</th></tr></thead>
+      <tbody>${clientes.map(c => {
+        const r = uso[c.id] || { bps: 0, up_bps: 0, down_bps: 0, pct_uso: null, blocos: [] };
+        const banda = c.banda_contratada_mbps || 0;
+        const pct = r.pct_uso;
+        const situacao = !banda ? '<span style="color:var(--text-muted);font-size:10px;">sem contrato</span>'
+          : pct === null ? '<span style="color:var(--text-muted);font-size:10px;">sem dados</span>'
+          : pct >= 100 ? '<span style="color:#f87171;font-weight:600;">CRÍTICO</span>'
+          : pct >= 80 ? '<span style="color:#fbbf24;font-weight:600;">ALERTA</span>'
+          : '<span style="color:#34d399;">OK</span>';
+        const ativo = state.clienteAtivo && String(state.clienteAtivo) === String(c.id);
+        return `<tr class="eq-row" data-id="${c.id}">
+          <td style="font-weight:600;">${esc(c.nome)}</td>
+          <td style="font-size:10px;font-family:var(--mono);color:var(--text-dim);">${(r.blocos && r.blocos.length ? r.blocos : (c.blocos || []).map(b => b.bloco)).join(', ')}</td>
+          <td class="eq-modelo">${esc(c.plano || '—')}</td>
+          <td class="eq-modelo">${banda ? banda + ' Mbps' : '—'}</td>
+          <td class="traf">${fmtBps(r.bps)}</td>
+          <td class="pct">${pct === null ? '—' : pct + '%'}<span class="bar-bg"><span class="bar-fill" style="width:${Math.min(pct || 0, 100)}%;${(pct || 0) >= 80 ? 'background:#fbbf24' : ''}"></span></span></td>
+          <td>${situacao}</td>
+          <td>
+            <button class="eq-btn ${ativo ? 'eq-ativo' : ''}" data-act="filtrar" title="Filtrar dashboard por este cliente"><i class="ph ph-funnel"></i></button>
+            <button class="eq-btn" data-act="editar"><i class="ph ph-pencil-simple"></i></button>
+            <button class="eq-btn" data-act="bloco" title="Adicionar bloco"><i class="ph ph-plus-circle"></i></button>
+            <button class="eq-btn" data-act="excluir" style="color:#f87171;"><i class="ph ph-trash"></i></button>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+    renderCliChart(resumo || []);
+    $('cli-chart-header').querySelector('.card-title').textContent = `Uso por Cliente · ${fmtBps(totalUso)} total`;
+  } catch {
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">erro ao carregar</div>';
+  }
+}
+
+function renderCliChart(lista) {
+  const el = $('cli-chart');
+  if (!lista.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">sem uso detectado</div>'; return; }
+  const max = Math.max(...lista.map(r => r.bps), 1);
+  el.innerHTML = `<div style="display:flex;align-items:flex-end;gap:14px;padding:16px;height:160px;border-bottom:1px solid var(--border);">
+    ${lista.map(r => {
+      const pct = Math.round(r.bps / max * 100);
+      const banda = r.banda_contratada_mbps;
+      const crit = banda && r.pct_uso >= 80;
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">${fmtBps(r.bps)}</span>
+        <div style="width:70%;max-width:60px;height:${Math.max(4, pct)}px;background:${crit ? 'linear-gradient(180deg,#f87171,rgba(248,113,113,.25))' : 'linear-gradient(180deg,var(--accent),rgba(139,92,246,.25))'};border-radius:4px 4px 0 0;" title="${esc(r.nome)}: ${fmtBps(r.bps)}"></div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="display:flex;gap:14px;padding:8px 16px;">
+    ${lista.map(r => `<div style="flex:1;text-align:center;font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(r.nome)}">${esc(r.nome)}</div>`).join('')}
+  </div>`;
+}
+
+function initCliBody() {
+  const body = $('cli-body');
+  if (!body) return;
+  body.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-act]');
+    const row = ev.target.closest('tr[data-id]');
+    if (!row) return;
+    const id = row.dataset.id;
+    const c = state.clientes.find(x => String(x.id) === id);
+    if (!c) return;
+    if (!btn) {
+      if (ev.target.closest('.traf') || ev.target.closest('.pct')) return;
+      state.clienteAtivo = id;
+      const sel = $('tb-cliente-select');
+      if (sel) sel.value = id;
+      setView('visao-geral');
+      return;
+    }
+    const act = btn.dataset.act;
+    if (act === 'filtrar') {
+      state.clienteAtivo = state.clienteAtivo && String(state.clienteAtivo) === id ? null : id;
+      const sel = $('tb-cliente-select');
+      if (sel) sel.value = state.clienteAtivo || '';
+      renderClientesView();
+    } else if (act === 'editar') {
+      cliModal(c);
+    } else if (act === 'bloco') {
+      blocoModal(c);
+    } else if (act === 'excluir') {
+      if (confirm(`Excluir cliente "${c.nome}" e seus blocos?`)) deleteCliente(c);
+    }
+  });
+  const add = $('cli-add');
+  if (add) add.addEventListener('click', () => cliModal(null));
+}
+
+function cliModal(c) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:999;';
+  const f = (v, ph, w = '100%') => `<input id="clm-${v}" value="${esc(c ? c[v] : '')}" placeholder="${ph}" style="width:${w};background:#0a0f1a;border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;">`;
+  const blocosStr = c ? (c.blocos || []).map(b => b.bloco).join(', ') : '';
+  overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:460px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:88vh;overflow:auto;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px;">${c ? 'Editar cliente' : 'Novo cliente'}</div>
+    <div style="display:grid;gap:10px;">
+      ${f('nome', 'Nome / Razão social')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${f('documento', 'CNPJ / CPF', '100%')}${f('plano', 'Plano (ex.: Fibra 300M)', '100%')}</div>
+      ${f('banda_contratada_mbps', 'Banda contratada (Mbps)', '100%')}
+      <input id="clm-blocos" value="${esc(blocosStr)}" placeholder="Blocos CIDR separados por vírgula (ex.: 189.0.0.0/22, 189.0.4.0/23)" style="width:100%;background:#0a0f1a;border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${f('contato', 'Contato', '100%')}${f('telefone', 'Telefone', '100%')}</div>
+      ${f('email', 'E-mail', '100%')}
+      ${f('endereco', 'Endereço', '100%')}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button id="clm-cancel" class="eq-btn">Cancelar</button>
+      <button id="clm-save" style="background:var(--accent);color:#050B14;border:none;border-radius:6px;padding:6px 14px;font-weight:600;font-size:12px;cursor:pointer;">Salvar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#clm-cancel').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#clm-save').addEventListener('click', async () => {
+    const val = id => overlay.querySelector('#clm-' + id).value.trim();
+    const blocos = overlay.querySelector('#clm-blocos').value.split(',').map(s => s.trim()).filter(Boolean);
+    const payload = {
+      nome: val('nome'), documento: val('documento'), plano: val('plano'),
+      banda_contratada_mbps: val('banda_contratada_mbps'), contato: val('contato'),
+      telefone: val('telefone'), email: val('email'), endereco: val('endereco'),
+      blocos
+    };
+    if (!payload.nome) { alert('Nome é obrigatório.'); return; }
+    try {
+      if (c) {
+        await apiFetch(`/clientes/${c.id}`, { raw: true, method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const atuais = new Set((c.blocos || []).map(b => b.bloco));
+        const novos = blocos.filter(b => !atuais.has(b));
+        const removidos = (c.blocos || []).filter(b => !blocos.includes(b.bloco));
+        for (const b of novos) await apiFetch(`/clientes/${c.id}/blocos`, { raw: true, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bloco: b }) });
+        for (const b of removidos) await apiFetch(`/clientes/blocos/${b.id}`, { raw: true, method: 'DELETE' });
+      } else {
+        await apiFetch('/clientes', { raw: true, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      }
+      overlay.remove();
+      renderClientesView();
+    } catch (err) { alert('Erro ao salvar: ' + err.message); }
+  });
+}
+
+function blocoModal(c) {
+  const bloco = prompt(`Adicionar bloco CIDR ao cliente "${c.nome}":`);
+  if (!bloco) return;
+  addBlocoCliente(c, bloco);
+}
+
+async function addBlocoCliente(c, bloco) {
+  try {
+    await apiFetch(`/clientes/${c.id}/blocos`, { raw: true, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bloco }) });
+    renderClientesView();
+  } catch (err) { alert('Erro ao adicionar bloco: ' + err.message); }
+}
+
+async function deleteCliente(c) {
+  try {
+    await apiFetch(`/clientes/${c.id}`, { raw: true, method: 'DELETE' });
+    if (String(state.clienteAtivo) === String(c.id)) {
+      state.clienteAtivo = null;
+      const sel = $('tb-cliente-select');
+      if (sel) sel.value = '';
+    }
+    renderClientesView();
+  } catch (err) { alert('Erro ao excluir: ' + err.message); }
+}
+
 // ── Subnets View ──
 let subnetsState = { prefixo: 24, lado: 'src' };
 
@@ -1459,6 +2297,7 @@ function startPoll() {
 async function init() {
   const ok = await authVerify();
   if (!ok) return;
+  loadPrefs();
   initNav();
   initPeriod();
   initBuscar();
@@ -1466,12 +2305,25 @@ async function init() {
   initFullscreen();
   initTopbarSearch();
   initCardActions();
+  initCustomizePanel();
+  initDashUI();
+  loadDashboards();
   initIpActions();
   initLiveFeed();
   initComparar();
   initAsnSearch();
   initSubnets();
   initMatrizSearch();
+  initEqSelect();
+  initEqBody();
+  loadEquipamentos();
+  initClienteSelect();
+  initCliBody();
+  loadClientes();
+  applyHiddenCards();
+  document.querySelectorAll('#period-bar .per-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === state.periodo);
+  });
   updatePageHead('visao-geral');
   renderView('visao-geral');
   $('last-update').textContent = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
